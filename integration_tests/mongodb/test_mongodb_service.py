@@ -1,3 +1,1 @@
-"""
-Integration tests for MongoDB service.
-"""
+"""Integration tests for MongoDB service."""

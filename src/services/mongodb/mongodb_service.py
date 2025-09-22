@@ -1,109 +1,63 @@
-"""Enhanced MongoDB service with comprehensive error handling and monitoring.
+"""Simplified MongoDB service for database operations.
 
-This module provides a robust MongoDB service implementation with features including:
-- Automatic retry logic for transient failures
-- Connection pooling and health checks
+This module provides a clean MongoDB service implementation with:
+- Strong typing for all operations
 - Transaction support
-- Performance metrics collection
-- Bulk operations
-- Pagination and aggregation utilities
+- Direct MongoDB operations without retry logic
+- Health check functionality
 """
 
 import logging
-import time
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Any, Dict, List, Optional, Union, Iterator, Tuple
-from pymongo import MongoClient
-from pymongo.collection import Collection
-from pymongo.database import Database
-from pymongo.results import DeleteResult, InsertOneResult, UpdateResult, BulkWriteResult
-from pymongo.errors import (
-    ConnectionFailure,
-    OperationFailure,
-    ServerSelectionTimeoutError,
-    AutoReconnect,
-    NetworkTimeout,
-    PyMongoError,
-)
-from pymongo.client_session import ClientSession
-from pymongo.operations import (
-    InsertOne,
-    UpdateOne,
-    UpdateMany,
-    DeleteOne,
-    DeleteMany,
-    ReplaceOne,
-)
+from typing import TYPE_CHECKING, Any
+
 from bson.objectid import ObjectId
-from dataclasses import dataclass
+from pymongo import MongoClient
+from pymongo.client_session import ClientSession
+from pymongo.collection import Collection
+from pymongo.errors import ConnectionFailure
+
+if TYPE_CHECKING:
+    from pymongo.database import Database
+from pymongo.operations import (
+    DeleteMany,
+    DeleteOne,
+    InsertOne,
+    ReplaceOne,
+    UpdateMany,
+    UpdateOne,
+)
+from pymongo.results import BulkWriteResult, DeleteResult, InsertOneResult, UpdateResult
 
 from .mongodb_models import MongoConfig
 
 
-@dataclass
-class OperationMetrics:
-    """Metrics for database operations."""
-
-    operation: str
-    collection: str
-    duration_ms: float
-    documents_affected: int
-    success: bool
-    error: Optional[str] = None
-
-
-@dataclass
-class HealthCheck:
-    """Database health check result."""
-
-    is_healthy: bool
-    response_time_ms: float
-    server_info: Dict[str, Any]
-    error: Optional[str] = None
-
-
-class MongoOperationError(Exception):
-    """Custom exception for MongoDB operation errors with retry context."""
-
-    def __init__(
-        self, message: str, operation: str, attempts: int, original_error: Exception
-    ):
-        super().__init__(message)
-        self.operation = operation
-        self.attempts = attempts
-        self.original_error = original_error
-
-
 class MongoService:
-    """Enhanced MongoDB service with transactions, retries, bulk operations, and monitoring."""
+    """Simplified MongoDB service for database operations."""
 
     def __init__(
         self,
         logger: logging.Logger,
         config: MongoConfig,
-        max_retries: int = 3,
-        retry_delay: float = 1.0,
-    ):
-        """Initialize MongoService with enhanced features.
+    ) -> None:
+        """Initialize MongoService.
 
         Args:
-            logger (logging.Logger): Standard Python logger instance
-            config (MongoConfig): MongoDB configuration model
-            max_retries (int): Maximum retry attempts for failed operations
-            retry_delay (float): Base delay in seconds between retries
+            logger: Standard Python logger instance
+            config: MongoDB configuration model
+
         """
         self.log = logger
         self.config = config
-        self.max_retries = max_retries
-        self.retry_delay = retry_delay
-        self._metrics: List[OperationMetrics] = []
 
         self.log.info(
-            f"Initializing enhanced MongoDB connection to database: {config.database}"
+            "Initializing MongoDB connection to database: %s",
+            config.database,
         )
 
         # Build connection parameters
-        connection_params = {
+        connection_params: dict[str, Any] = {
             "host": config.url,
             "maxPoolSize": config.max_pool_size,
             "minPoolSize": config.min_pool_size,
@@ -120,675 +74,517 @@ class MongoService:
             connection_params["password"] = config.password
 
         try:
-            self._client = MongoClient(**connection_params)
-            self._db: Database = self._client[config.database]
+            self._client: MongoClient[dict[str, Any]] = MongoClient(**connection_params)
+            self._db: Database[dict[str, Any]] = self._client[config.database]
 
             # Verify connection
-            health = self.health_check()
-            if not health.is_healthy:
-                raise ConnectionFailure(f"Failed to connect to MongoDB: {health.error}")
-
+            server_info = self.ping()
             self.log.info(
-                f"Successfully connected to MongoDB. Server info: {health.server_info.get('version', 'unknown')}"
+                "Successfully connected to MongoDB. Server version: %s",
+                server_info.get("version", "unknown"),
             )
 
-        except Exception as e:
-            self.log.error(f"Failed to initialize MongoDB connection: {e}")
+        except Exception:
+            self.log.exception("Failed to initialize MongoDB connection")
             raise
 
-    def _record_metrics(
-        self,
-        operation: str,
-        collection: str,
-        duration_ms: float,
-        documents_affected: int,
-        success: bool,
-        error: Optional[str] = None,
-    ) -> None:
-        """Record operation metrics for monitoring."""
-        metrics = OperationMetrics(
-            operation=operation,
-            collection=collection,
-            duration_ms=duration_ms,
-            documents_affected=documents_affected,
-            success=success,
-            error=error,
-        )
-        self._metrics.append(metrics)
+    def ping(self) -> dict[str, Any]:
+        """Ping the MongoDB server to verify connection.
 
-        if success:
-            self.log.debug(
-                f"{operation} on {collection}: {documents_affected} docs in {duration_ms:.2f}ms"
-            )
-        else:
-            self.log.warning(
-                f"{operation} on {collection} failed after {duration_ms:.2f}ms: {error}"
-            )
+        Returns:
+            Server information dictionary
 
-    def _execute_with_retry(
-        self, operation_name: str, operation_func, collection_name: str
-    ) -> Any:
-        """Execute operation with retry logic and metrics tracking."""
-        last_exception = None
-        start_time = time.time()
+        Raises:
+            ConnectionFailure: If unable to connect to MongoDB
 
-        for attempt in range(self.max_retries + 1):
-            try:
-                result = operation_func()
-                duration_ms = (time.time() - start_time) * 1000
+        """
+        try:
+            return self._client.server_info()
+        except ConnectionFailure:
+            self.log.exception("MongoDB connection failed")
+            raise
 
-                # Count affected documents based on result type
-                documents_affected = 0
-                if hasattr(result, "inserted_id"):
-                    documents_affected = 1
-                elif hasattr(result, "inserted_ids"):
-                    documents_affected = len(result.inserted_ids)
-                elif hasattr(result, "modified_count"):
-                    documents_affected = result.modified_count
-                elif hasattr(result, "deleted_count"):
-                    documents_affected = result.deleted_count
-                elif isinstance(result, list):
-                    documents_affected = len(result)
-
-                self._record_metrics(
-                    operation_name,
-                    collection_name,
-                    duration_ms,
-                    documents_affected,
-                    True,
-                )
-                return result
-
-            except (AutoReconnect, NetworkTimeout, ServerSelectionTimeoutError) as e:
-                last_exception = e
-                if attempt < self.max_retries:
-                    delay = self.retry_delay * (2**attempt)  # Exponential backoff
-                    self.log.warning(
-                        f"{operation_name} attempt {attempt + 1} failed, retrying in {delay}s: {e}"
-                    )
-                    time.sleep(delay)
-                else:
-                    break
-            except (ConnectionFailure, OperationFailure, PyMongoError) as e:
-                # Don't retry these errors
-                last_exception = e
-                break
-
-        # All retries failed
-        duration_ms = (time.time() - start_time) * 1000
-        self._record_metrics(
-            operation_name, collection_name, duration_ms, 0, False, str(last_exception)
-        )
-
-        raise MongoOperationError(
-            f"{operation_name} failed after {self.max_retries + 1} attempts",
-            operation_name,
-            self.max_retries + 1,
-            last_exception,
-        )
-
-    def get_collection(self, collection_name: str) -> Collection:
+    def get_collection(self, collection_name: str) -> Collection[dict[str, Any]]:
         """Get a MongoDB collection.
 
         Args:
-            collection_name (str): Name of the collection
+            collection_name: Name of the collection
 
         Returns:
-            Collection: MongoDB collection instance
+            MongoDB collection instance
+
         """
         return self._db[collection_name]
-
-    def health_check(self) -> HealthCheck:
-        """Perform a health check on the MongoDB connection.
-
-        Returns:
-            HealthCheck: Health check result with timing and server info
-        """
-        start_time = time.time()
-        try:
-            server_info = self._client.server_info()
-            response_time_ms = (time.time() - start_time) * 1000
-            return HealthCheck(
-                is_healthy=True,
-                response_time_ms=response_time_ms,
-                server_info=server_info,
-            )
-        except Exception as e:
-            response_time_ms = (time.time() - start_time) * 1000
-            return HealthCheck(
-                is_healthy=False,
-                response_time_ms=response_time_ms,
-                server_info={},
-                error=str(e),
-            )
 
     @contextmanager
     def transaction(self) -> Iterator[ClientSession]:
         """Context manager for MongoDB transactions.
 
         Yields:
-            ClientSession: Session for transaction operations
+            Session for transaction operations
 
         Example:
             with mongo_service.transaction() as session:
                 mongo_service.insert_one("users", {"name": "Alice"}, session=session)
-                mongo_service.update_one("stats", {"_id": 1}, {"$inc": {"count": 1}}, session=session)
+                mongo_service.update_one(
+                    "stats", {"_id": 1}, {"$inc": {"count": 1}}, session=session
+                )
+
         """
+        self.log.debug("Starting MongoDB transaction")
         session = self._client.start_session()
         try:
             with session.start_transaction():
-                self.log.debug("Started MongoDB transaction")
+                self.log.debug("MongoDB transaction started successfully")
                 yield session
-                self.log.debug("Committing MongoDB transaction")
-        except Exception as e:
-            self.log.error(f"Transaction failed, rolling back: {e}")
+                self.log.info("MongoDB transaction committed successfully")
+        except Exception:
+            self.log.exception("MongoDB transaction failed, rolling back")
             raise
         finally:
             session.end_session()
+            self.log.debug("MongoDB transaction session ended")
 
     def insert_one(
         self,
         collection_name: str,
-        document: Dict[str, Any],
-        session: Optional[ClientSession] = None,
+        document: dict[str, Any],
+        session: ClientSession | None = None,
     ) -> InsertOneResult:
         """Insert a single document into a collection.
 
         Args:
-            collection_name (str): Name of the collection
-            document (Dict[str, Any]): Document to insert
-            session (Optional[ClientSession]): Session for transaction support
+            collection_name: Name of the collection
+            document: Document to insert
+            session: Optional session for transaction support
 
         Returns:
-            InsertOneResult: Result of the insert operation with proper type
+            Result of the insert operation
+
         """
-
-        def _insert():
-            collection = self.get_collection(collection_name)
-            return collection.insert_one(document, session=session)
-
-        return self._execute_with_retry("insert_one", _insert, collection_name)
+        self.log.debug("Inserting document into collection: %s", collection_name)
+        collection = self.get_collection(collection_name)
+        result = collection.insert_one(document, session=session)
+        self.log.info(
+            "Successfully inserted document with ID %s into collection: %s",
+            result.inserted_id,
+            collection_name,
+        )
+        return result
 
     def insert_many(
         self,
         collection_name: str,
-        documents: List[Dict[str, Any]],
-        session: Optional[ClientSession] = None,
+        documents: list[dict[str, Any]],
+        *,
         ordered: bool = True,
-    ) -> List[ObjectId]:
+        session: ClientSession | None = None,
+    ) -> list[ObjectId]:
         """Insert multiple documents into a collection.
 
         Args:
-            collection_name (str): Name of the collection
-            documents (List[Dict[str, Any]]): List of documents to insert
-            session (Optional[ClientSession]): Session for transaction support
-            ordered (bool): Whether to stop on first error
+            collection_name: Name of the collection
+            documents: List of documents to insert
+            ordered: Whether to stop on first error
+            session: Optional session for transaction support
 
         Returns:
-            List[ObjectId]: List of inserted document IDs
+            List of inserted document IDs
+
         """
-
-        def _insert():
-            collection = self.get_collection(collection_name)
-            result = collection.insert_many(documents, session=session, ordered=ordered)
-            return result.inserted_ids
-
-        return self._execute_with_retry("insert_many", _insert, collection_name)
+        doc_count = len(documents)
+        self.log.debug(
+            "Inserting %d documents into collection: %s (ordered=%s)",
+            doc_count,
+            collection_name,
+            ordered,
+        )
+        collection = self.get_collection(collection_name)
+        result = collection.insert_many(documents, ordered=ordered, session=session)
+        self.log.info(
+            "Successfully inserted %d documents into collection: %s",
+            len(result.inserted_ids),
+            collection_name,
+        )
+        return result.inserted_ids
 
     def find_one(
         self,
         collection_name: str,
-        query: Dict[str, Any],
-        projection: Optional[Dict[str, Any]] = None,
-        session: Optional[ClientSession] = None,
-    ) -> Optional[Dict[str, Any]]:
+        query: dict[str, Any],
+        projection: dict[str, Any] | None = None,
+        session: ClientSession | None = None,
+    ) -> dict[str, Any] | None:
         """Find a single document in a collection.
 
         Args:
-            collection_name (str): Name of the collection
-            query (Dict[str, Any]): Query filter
-            projection (Optional[Dict[str, Any]], optional): Fields to include/exclude. Defaults to None.
-            session (Optional[ClientSession]): Session for transaction support
+            collection_name: Name of the collection
+            query: Query filter
+            projection: Fields to include/exclude
+            session: Optional session for transaction support
 
         Returns:
-            Optional[Dict[str, Any]]: Found document or None with ObjectId converted to string
+            Found document or None
+
         """
+        self.log.debug(
+            "Finding document in collection: %s with query: %s",
+            collection_name,
+            query,
+        )
+        collection = self.get_collection(collection_name)
+        result = collection.find_one(query, projection, session=session)
+        if result:
+            self.log.debug(
+                "Found document with ID %s in collection: %s",
+                result.get("_id"),
+                collection_name,
+            )
+        else:
+            self.log.debug("No document found in collection: %s", collection_name)
+        return result
 
-        def _find():
-            collection = self.get_collection(collection_name)
-            doc = collection.find_one(query, projection, session=session)
-            if doc and "_id" in doc:
-                doc["_id"] = str(doc["_id"])
-            return doc
-
-        return self._execute_with_retry("find_one", _find, collection_name)
-
-    def find_many(
+    def find_many(  # noqa: PLR0913
         self,
         collection_name: str,
-        query: Dict[str, Any],
-        projection: Optional[Dict[str, Any]] = None,
-        sort: Optional[List[tuple]] = None,
-        limit: Optional[int] = None,
-        skip: Optional[int] = None,
-        session: Optional[ClientSession] = None,
-    ) -> List[Dict[str, Any]]:
+        query: dict[str, Any],
+        *,
+        projection: dict[str, Any] | None = None,
+        sort: list[tuple[str, int]] | None = None,
+        limit: int = 0,
+        skip: int = 0,
+        session: ClientSession | None = None,
+    ) -> list[dict[str, Any]]:
         """Find multiple documents in a collection.
 
         Args:
-            collection_name (str): Name of the collection
-            query (Dict[str, Any]): Query filter
-            projection (Optional[Dict[str, Any]], optional): Fields to include/exclude. Defaults to None.
-            sort (Optional[List[tuple]], optional): Sort criteria. Defaults to None.
-            limit (Optional[int], optional): Maximum number of documents to return. Defaults to None.
-            skip (Optional[int], optional): Number of documents to skip. Defaults to None.
-            session (Optional[ClientSession]): Session for transaction support
+            collection_name: Name of the collection
+            query: Query filter
+            projection: Fields to include/exclude
+            sort: Sort criteria as list of (field, direction) tuples
+            limit: Maximum number of documents to return (0 = no limit)
+            skip: Number of documents to skip
+            session: Optional session for transaction support
 
         Returns:
-            List[Dict[str, Any]]: List of found documents with ObjectIds converted to strings
+            List of found documents
+
         """
+        self.log.debug(
+            "Finding documents in collection: %s with query: %s (limit=%d, skip=%d)",
+            collection_name,
+            query,
+            limit,
+            skip,
+        )
+        collection = self.get_collection(collection_name)
+        cursor = collection.find(query, projection, session=session)
 
-        def _find():
-            collection = self.get_collection(collection_name)
-            cursor = collection.find(query, projection, session=session)
+        if sort:
+            cursor = cursor.sort(sort)
+        if skip > 0:
+            cursor = cursor.skip(skip)
+        if limit > 0:
+            cursor = cursor.limit(limit)
 
-            if sort:
-                cursor = cursor.sort(sort)
-            if skip:
-                cursor = cursor.skip(skip)
-            if limit:
-                cursor = cursor.limit(limit)
-
-            # Convert cursor to list and ObjectId to string for JSON serialization
-            documents = list(cursor)
-            for doc in documents:
-                if "_id" in doc:
-                    doc["_id"] = str(doc["_id"])
-
-            return documents
-
-        return self._execute_with_retry("find_many", _find, collection_name)
+        results = list(cursor)
+        self.log.info(
+            "Found %d documents in collection: %s",
+            len(results),
+            collection_name,
+        )
+        return results
 
     def update_one(
         self,
         collection_name: str,
-        query: Dict[str, Any],
-        update: Dict[str, Any],
+        query: dict[str, Any],
+        update: dict[str, Any],
+        *,
         upsert: bool = False,
-        session: Optional[ClientSession] = None,
+        session: ClientSession | None = None,
     ) -> UpdateResult:
         """Update a single document in a collection.
 
         Args:
-            collection_name (str): Name of the collection
-            query (Dict[str, Any]): Query filter
-            update (Dict[str, Any]): Update operations
-            upsert (bool, optional): Create document if it doesn't exist. Defaults to False.
-            session (Optional[ClientSession]): Session for transaction support
+            collection_name: Name of the collection
+            query: Query filter
+            update: Update operations
+            upsert: Create document if it doesn't exist
+            session: Optional session for transaction support
 
         Returns:
-            UpdateResult: Result of the update operation
+            Result of the update operation
+
         """
-
-        def _update():
-            collection = self.get_collection(collection_name)
-            return collection.update_one(query, update, upsert=upsert, session=session)
-
-        return self._execute_with_retry("update_one", _update, collection_name)
-
-    def update_one_by_id(
-        self,
-        collection_name: str,
-        id: str,
-        update: Dict[str, Any],
-        session: Optional[ClientSession] = None,
-    ) -> UpdateResult:
-        """Update a single document in a collection by ID.
-
-        Args:
-            collection_name (str): Name of the collection
-            id (str): ID of the document
-            update (Dict[str, Any]): Update operations
-            session (Optional[ClientSession]): Session for transaction support
-
-        Returns:
-            UpdateResult: Result of the update operation
-        """
-
-        def _update():
-            collection = self.get_collection(collection_name)
-            return collection.update_one({"_id": ObjectId(id)}, update, session=session)
-
-        return self._execute_with_retry("update_one_by_id", _update, collection_name)
+        self.log.debug(
+            "Updating document in collection: %s with query: %s (upsert=%s)",
+            collection_name,
+            query,
+            upsert,
+        )
+        collection = self.get_collection(collection_name)
+        result = collection.update_one(query, update, upsert=upsert, session=session)
+        self.log.info(
+            "Updated %d document(s) in collection: %s (matched=%d, upserted_id=%s)",
+            result.modified_count,
+            collection_name,
+            result.matched_count,
+            result.upserted_id,
+        )
+        return result
 
     def update_many(
         self,
         collection_name: str,
-        query: Dict[str, Any],
-        update: Dict[str, Any],
+        query: dict[str, Any],
+        update: dict[str, Any],
+        *,
         upsert: bool = False,
-        session: Optional[ClientSession] = None,
+        session: ClientSession | None = None,
     ) -> UpdateResult:
         """Update multiple documents in a collection.
 
         Args:
-            collection_name (str): Name of the collection
-            query (Dict[str, Any]): Query filter
-            update (Dict[str, Any]): Update operations
-            upsert (bool, optional): Create documents if they don't exist. Defaults to False.
-            session (Optional[ClientSession]): Session for transaction support
+            collection_name: Name of the collection
+            query: Query filter
+            update: Update operations
+            upsert: Create documents if they don't exist
+            session: Optional session for transaction support
 
         Returns:
-            UpdateResult: Result of the update operation
+            Result of the update operation
+
         """
-
-        def _update():
-            collection = self.get_collection(collection_name)
-            return collection.update_many(query, update, upsert=upsert, session=session)
-
-        return self._execute_with_retry("update_many", _update, collection_name)
+        self.log.debug(
+            "Updating multiple documents in collection: %s with query: %s (upsert=%s)",
+            collection_name,
+            query,
+            upsert,
+        )
+        collection = self.get_collection(collection_name)
+        result = collection.update_many(query, update, upsert=upsert, session=session)
+        self.log.info(
+            "Updated %d document(s) in collection: %s (matched=%d)",
+            result.modified_count,
+            collection_name,
+            result.matched_count,
+        )
+        return result
 
     def delete_one(
         self,
         collection_name: str,
-        query: Dict[str, Any],
-        session: Optional[ClientSession] = None,
+        query: dict[str, Any],
+        session: ClientSession | None = None,
     ) -> DeleteResult:
         """Delete a single document from a collection.
 
         Args:
-            collection_name (str): Name of the collection
-            query (Dict[str, Any]): Query filter
-            session (Optional[ClientSession]): Session for transaction support
+            collection_name: Name of the collection
+            query: Query filter
+            session: Optional session for transaction support
 
         Returns:
-            DeleteResult: Result of the delete operation
+            Result of the delete operation
+
         """
-
-        def _delete():
-            collection = self.get_collection(collection_name)
-            return collection.delete_one(query, session=session)
-
-        return self._execute_with_retry("delete_one", _delete, collection_name)
+        self.log.debug(
+            "Deleting document from collection: %s with query: %s",
+            collection_name,
+            query,
+        )
+        collection = self.get_collection(collection_name)
+        result = collection.delete_one(query, session=session)
+        self.log.info(
+            "Deleted %d document(s) from collection: %s",
+            result.deleted_count,
+            collection_name,
+        )
+        return result
 
     def delete_many(
         self,
         collection_name: str,
-        query: Dict[str, Any],
-        session: Optional[ClientSession] = None,
+        query: dict[str, Any],
+        session: ClientSession | None = None,
     ) -> DeleteResult:
         """Delete multiple documents from a collection.
 
         Args:
-            collection_name (str): Name of the collection
-            query (Dict[str, Any]): Query filter
-            session (Optional[ClientSession]): Session for transaction support
+            collection_name: Name of the collection
+            query: Query filter
+            session: Optional session for transaction support
 
         Returns:
-            DeleteResult: Result of the delete operation
+            Result of the delete operation
+
         """
-
-        def _delete():
-            collection = self.get_collection(collection_name)
-            return collection.delete_many(query, session=session)
-
-        return self._execute_with_retry("delete_many", _delete, collection_name)
+        self.log.debug(
+            "Deleting multiple documents from collection: %s with query: %s",
+            collection_name,
+            query,
+        )
+        collection = self.get_collection(collection_name)
+        result = collection.delete_many(query, session=session)
+        self.log.info(
+            "Deleted %d document(s) from collection: %s",
+            result.deleted_count,
+            collection_name,
+        )
+        return result
 
     def count_documents(
         self,
         collection_name: str,
-        query: Dict[str, Any],
-        session: Optional[ClientSession] = None,
+        query: dict[str, Any],
+        session: ClientSession | None = None,
     ) -> int:
         """Count documents in a collection that match a query.
 
         Args:
-            collection_name (str): Name of the collection
-            query (Dict[str, Any]): Query filter
-            session (Optional[ClientSession]): Session for transaction support
+            collection_name: Name of the collection
+            query: Query filter
+            session: Optional session for transaction support
 
         Returns:
-            int: Number of matching documents
+            Number of matching documents
+
         """
-
-        def _count():
-            collection = self.get_collection(collection_name)
-            return collection.count_documents(query, session=session)
-
-        return self._execute_with_retry("count_documents", _count, collection_name)
+        self.log.debug(
+            "Counting documents in collection: %s with query: %s",
+            collection_name,
+            query,
+        )
+        collection = self.get_collection(collection_name)
+        count = collection.count_documents(query, session=session)
+        self.log.debug(
+            "Found %d documents matching query in collection: %s",
+            count,
+            collection_name,
+        )
+        return count
 
     def aggregate(
         self,
         collection_name: str,
-        pipeline: List[Dict[str, Any]],
-        session: Optional[ClientSession] = None,
-    ) -> List[Dict[str, Any]]:
+        pipeline: list[dict[str, Any]],
+        session: ClientSession | None = None,
+    ) -> list[dict[str, Any]]:
         """Perform an aggregation pipeline on a collection.
 
         Args:
-            collection_name (str): Name of the collection
-            pipeline (List[Dict[str, Any]]): Aggregation pipeline stages
-            session (Optional[ClientSession]): Session for transaction support
+            collection_name: Name of the collection
+            pipeline: Aggregation pipeline stages
+            session: Optional session for transaction support
 
         Returns:
-            List[Dict[str, Any]]: Result of the aggregation with ObjectIds converted to strings
+            Result of the aggregation
+
         """
-
-        def _aggregate():
-            collection = self.get_collection(collection_name)
-            results = list(collection.aggregate(pipeline, session=session))
-
-            # Convert ObjectIds to strings for JSON serialization
-            for doc in results:
-                if "_id" in doc and isinstance(doc["_id"], ObjectId):
-                    doc["_id"] = str(doc["_id"])
-
-            return results
-
-        return self._execute_with_retry("aggregate", _aggregate, collection_name)
+        pipeline_stages = len(pipeline)
+        self.log.debug(
+            "Running aggregation on collection: %s with %d pipeline stages",
+            collection_name,
+            pipeline_stages,
+        )
+        collection = self.get_collection(collection_name)
+        results = list(collection.aggregate(pipeline, session=session))
+        self.log.info(
+            "Aggregation completed on collection: %s, returned %d results",
+            collection_name,
+            len(results),
+        )
+        return results
 
     def create_index(
         self,
         collection_name: str,
-        keys: Union[str, List[tuple]],
+        keys: str | list[tuple[str, int]],
+        *,
         unique: bool = False,
+        **kwargs: Any,  # noqa: ANN401
     ) -> str:
         """Create an index on a collection.
 
         Args:
-            collection_name (str): Name of the collection
-            keys (Union[str, List[tuple]]): Index specification
-            unique (bool, optional): Whether the index should be unique. Defaults to False.
+            collection_name: Name of the collection
+            keys: Index specification (field name or list of (field, direction) tuples)
+            unique: Whether the index should be unique
+            **kwargs: Additional index options
 
         Returns:
-            str: Name of the created index
+            Name of the created index
+
         """
+        self.log.debug(
+            "Creating index on collection: %s with keys: %s (unique=%s)",
+            collection_name,
+            keys,
+            unique,
+        )
+        collection = self.get_collection(collection_name)
+        index_name = collection.create_index(keys, unique=unique, **kwargs)
+        self.log.info(
+            "Successfully created index '%s' on collection: %s",
+            index_name,
+            collection_name,
+        )
+        return index_name
 
-        def _create_index():
-            collection = self.get_collection(collection_name)
-            return collection.create_index(keys, unique=unique)
-
-        return self._execute_with_retry("create_index", _create_index, collection_name)
-
-    # Bulk Operations
     def bulk_write(
         self,
         collection_name: str,
-        operations: List[
-            Union[InsertOne, UpdateOne, UpdateMany, DeleteOne, DeleteMany, ReplaceOne]
+        operations: list[
+            InsertOne[dict[str, Any]]
+            | UpdateOne
+            | UpdateMany
+            | DeleteOne
+            | DeleteMany
+            | ReplaceOne[dict[str, Any]]
         ],
+        *,
         ordered: bool = True,
-        session: Optional[ClientSession] = None,
+        session: ClientSession | None = None,
     ) -> BulkWriteResult:
         """Execute multiple write operations in a single request.
 
         Args:
-            collection_name (str): Name of the collection
-            operations (List): List of bulk operations
-            ordered (bool): Whether operations should be executed in order
-            session (Optional[ClientSession]): Session for transaction support
+            collection_name: Name of the collection
+            operations: List of bulk operations
+            ordered: Whether operations should be executed in order
+            session: Optional session for transaction support
 
         Returns:
-            BulkWriteResult: Result of the bulk write operation
+            Result of the bulk write operation
+
         """
-
-        def _bulk_write():
-            collection = self.get_collection(collection_name)
-            return collection.bulk_write(operations, ordered=ordered, session=session)
-
-        return self._execute_with_retry("bulk_write", _bulk_write, collection_name)
-
-    def bulk_insert(
-        self,
-        collection_name: str,
-        documents: List[Dict[str, Any]],
-        ordered: bool = True,
-        session: Optional[ClientSession] = None,
-    ) -> BulkWriteResult:
-        """Bulk insert multiple documents.
-
-        Args:
-            collection_name (str): Name of the collection
-            documents (List[Dict[str, Any]]): Documents to insert
-            ordered (bool): Whether to stop on first error
-            session (Optional[ClientSession]): Session for transaction support
-
-        Returns:
-            BulkWriteResult: Result of the bulk insert operation
-        """
-        operations = [InsertOne(doc) for doc in documents]
-        return self.bulk_write(
-            collection_name, operations, ordered=ordered, session=session
-        )
-
-    # Enhanced Aggregation Utilities
-    def paginate(
-        self,
-        collection_name: str,
-        query: Dict[str, Any],
-        page: int = 1,
-        page_size: int = 20,
-        sort: Optional[List[tuple]] = None,
-        projection: Optional[Dict[str, Any]] = None,
-        session: Optional[ClientSession] = None,
-    ) -> Tuple[List[Dict[str, Any]], int]:
-        """Paginate query results with total count.
-
-        Args:
-            collection_name (str): Name of the collection
-            query (Dict[str, Any]): Query filter
-            page (int): Page number (1-based)
-            page_size (int): Number of documents per page
-            sort (Optional[List[tuple]]): Sort criteria
-            projection (Optional[Dict[str, Any]]): Fields to include/exclude
-            session (Optional[ClientSession]): Session for transaction support
-
-        Returns:
-            Tuple[List[Dict[str, Any]], int]: (documents, total_count)
-        """
-        skip = (page - 1) * page_size
-        documents = self.find_many(
+        operation_count = len(operations)
+        self.log.debug(
+            "Executing bulk write with %d operations on collection: %s (ordered=%s)",
+            operation_count,
             collection_name,
-            query,
-            projection=projection,
-            sort=sort,
-            limit=page_size,
-            skip=skip,
-            session=session,
+            ordered,
         )
-        total_count = self.count_documents(collection_name, query, session=session)
-        return documents, total_count
-
-    def aggregate_with_facets(
-        self,
-        collection_name: str,
-        pipeline: List[Dict[str, Any]],
-        facets: Dict[str, List[Dict[str, Any]]],
-        session: Optional[ClientSession] = None,
-    ) -> Dict[str, List[Dict[str, Any]]]:
-        """Perform aggregation with multiple faceted outputs.
-
-        Args:
-            collection_name (str): Name of the collection
-            pipeline (List[Dict[str, Any]]): Base aggregation pipeline
-            facets (Dict[str, List[Dict[str, Any]]]): Named facet pipelines
-            session (Optional[ClientSession]): Session for transaction support
-
-        Returns:
-            Dict[str, List[Dict[str, Any]]]: Faceted results
-        """
-        full_pipeline = pipeline + [{"$facet": facets}]
-        result = self.aggregate(collection_name, full_pipeline, session=session)
-        return result[0] if result else {}
-
-    # Monitoring and Analytics
-    def get_metrics(self, clear_after_read: bool = False) -> List[OperationMetrics]:
-        """Get collected operation metrics.
-
-        Args:
-            clear_after_read (bool): Whether to clear metrics after reading
-
-        Returns:
-            List[OperationMetrics]: List of operation metrics
-        """
-        metrics = self._metrics.copy()
-        if clear_after_read:
-            self._metrics.clear()
-        return metrics
-
-    def get_performance_summary(self) -> Dict[str, Any]:
-        """Get a summary of performance metrics.
-
-        Returns:
-            Dict[str, Any]: Performance summary statistics
-        """
-        if not self._metrics:
-            return {"total_operations": 0}
-
-        successful_ops = [m for m in self._metrics if m.success]
-        failed_ops = [m for m in self._metrics if not m.success]
-
-        avg_duration = (
-            sum(m.duration_ms for m in successful_ops) / len(successful_ops)
-            if successful_ops
-            else 0
+        collection = self.get_collection(collection_name)
+        result = collection.bulk_write(operations, ordered=ordered, session=session)
+        self.log.info(
+            "Bulk write completed on collection: %s - "
+            "inserted: %d, matched: %d, modified: %d, deleted: %d, upserted: %d",
+            collection_name,
+            result.inserted_count,
+            result.matched_count,
+            result.modified_count,
+            result.deleted_count,
+            result.upserted_count,
         )
-        total_docs = sum(m.documents_affected for m in successful_ops)
-
-        operations_by_type = {}
-        for metric in self._metrics:
-            op_type = metric.operation
-            if op_type not in operations_by_type:
-                operations_by_type[op_type] = {
-                    "count": 0,
-                    "avg_duration_ms": 0,
-                    "total_docs": 0,
-                }
-
-            ops = [m for m in successful_ops if m.operation == op_type]
-            if ops:
-                operations_by_type[op_type]["count"] = len(ops)
-                operations_by_type[op_type]["avg_duration_ms"] = sum(
-                    m.duration_ms for m in ops
-                ) / len(ops)
-                operations_by_type[op_type]["total_docs"] = sum(
-                    m.documents_affected for m in ops
-                )
-
-        return {
-            "total_operations": len(self._metrics),
-            "successful_operations": len(successful_ops),
-            "failed_operations": len(failed_ops),
-            "average_duration_ms": round(avg_duration, 2),
-            "total_documents_affected": total_docs,
-            "operations_by_type": operations_by_type,
-            "error_rate": len(failed_ops) / len(self._metrics) if self._metrics else 0,
-        }
+        return result
 
     def close(self) -> None:
-        """Close the MongoDB connection and cleanup resources."""
+        """Close the MongoDB connection."""
         try:
             self._client.close()
             self.log.info("MongoDB connection closed successfully")
-        except Exception as e:
-            self.log.error(f"Error closing MongoDB connection: {e}")
+        except Exception:
+            self.log.exception("Error closing MongoDB connection")
+            raise

@@ -26,7 +26,7 @@ dev = [
 ]
 
 [tool.ruff]
-select = ["ALL"]
+lint.select = ["ALL"]
 
 [tool.setuptools]
 package-dir = { "" = "src" }
