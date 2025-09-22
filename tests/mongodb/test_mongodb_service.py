@@ -11,6 +11,7 @@ This module contains tests for the MongoDB service including:
 
 import logging
 from collections.abc import Iterator
+from typing import Any
 from unittest.mock import Mock, patch
 
 import pytest
@@ -27,8 +28,6 @@ from services.mongodb.mongodb_service import MongoService
 # ruff: noqa: S106  # hardcoded passwords in tests are acceptable
 # ruff: noqa: FBT003  # boolean literals in function calls ok in tests
 # ruff: noqa: PLC0415  # imports in functions acceptable in tests
-
-# nested with statements can be more readable in tests
 
 
 @pytest.fixture
@@ -47,13 +46,24 @@ def valid_config() -> MongoConfig:
         password="test_pass",
         max_pool_size=50,
         min_pool_size=5,
+        server_selection_timeout_ms=30000,
+        connect_timeout_ms=10000,
     )
 
 
 @pytest.fixture
 def config_without_auth() -> MongoConfig:
     """Create a MongoDB configuration without authentication."""
-    return MongoConfig(url="mongodb://localhost:27017", database="test_db")
+    return MongoConfig(
+        url="mongodb://localhost:27017",
+        database="test_db",
+        username=None,
+        password=None,
+        max_pool_size=100,
+        min_pool_size=0,
+        server_selection_timeout_ms=30000,
+        connect_timeout_ms=10000,
+    )
 
 
 @pytest.fixture
@@ -73,7 +83,15 @@ def mongo_service(
     # Mock ping method to avoid actual connection during init
     with patch.object(MongoService, "ping") as mock_ping:
         mock_ping.return_value = {"version": "5.0.0"}
-        return MongoService(mock_logger, valid_config)
+        service = MongoService(mock_logger, valid_config)
+
+        # Set up the database mock properly to be subscriptable
+        mock_db = Mock()
+        mock_collection = Mock()
+        mock_db.__getitem__ = Mock(return_value=mock_collection)
+        service._db = mock_db  # type: ignore[attr-defined]
+
+        return service
 
 
 class TestMongoServiceInitialization:
@@ -95,7 +113,7 @@ class TestMongoServiceInitialization:
                 valid_config.database,
             )
 
-            expected_params = {
+            expected_params: dict[str, Any] = {
                 "host": valid_config.url,
                 "maxPoolSize": valid_config.max_pool_size,
                 "minPoolSize": valid_config.min_pool_size,
@@ -122,7 +140,7 @@ class TestMongoServiceInitialization:
             mock_ping.return_value = {"version": "5.0.0"}
             service = MongoService(mock_logger, config_without_auth)
 
-            expected_params = {
+            expected_params: dict[str, Any] = {
                 "host": config_without_auth.url,
                 "maxPoolSize": config_without_auth.max_pool_size,
                 "minPoolSize": config_without_auth.min_pool_size,
@@ -156,24 +174,25 @@ class TestPingMethod:
 
     def test_ping_success(self, mongo_service: MongoService) -> None:
         """Test successful ping."""
-        server_info = {"version": "5.0.0", "modules": []}
-        mongo_service._client.server_info.return_value = server_info
+        server_info: dict[str, Any] = {"version": "5.0.0", "modules": []}
+        # Configure the mock to return server_info when server_info() is called
+        mongo_service._client.server_info = Mock(return_value=server_info)  # type: ignore[attr-defined]
 
         result = mongo_service.ping()
 
         assert result == server_info
-        mongo_service._client.server_info.assert_called_once()
+        mongo_service._client.server_info.assert_called_once()  # type: ignore[attr-defined]
 
     def test_ping_failure(self, mongo_service: MongoService) -> None:
         """Test ping failure."""
-        mongo_service._client.server_info.side_effect = ConnectionFailure(
-            "Connection failed",
+        mongo_service._client.server_info = Mock(  # type: ignore[attr-defined]
+            side_effect=ConnectionFailure("Connection failed"),
         )
 
         with pytest.raises(ConnectionFailure):
             mongo_service.ping()
 
-        mongo_service.log.exception.assert_called_once_with("MongoDB connection failed")
+        mongo_service.log.exception.assert_called_once_with("MongoDB connection failed")  # type: ignore[attr-defined]
 
 
 class TestGetCollection:
@@ -185,8 +204,8 @@ class TestGetCollection:
 
         collection = mongo_service.get_collection(collection_name)
 
-        mongo_service._db.__getitem__.assert_called_once_with(collection_name)
-        assert collection == mongo_service._db[collection_name]
+        mongo_service._db.__getitem__.assert_called_once_with(collection_name)  # type: ignore[attr-defined]
+        assert collection == mongo_service._db[collection_name]  # type: ignore[attr-defined]
 
 
 class TestTransactions:
@@ -197,18 +216,18 @@ class TestTransactions:
         mock_session = Mock()
         mock_session.start_transaction.return_value.__enter__ = Mock(return_value=None)
         mock_session.start_transaction.return_value.__exit__ = Mock(return_value=None)
-        mongo_service._client.start_session.return_value = mock_session
+        mongo_service._client.start_session = Mock(return_value=mock_session)  # type: ignore[attr-defined]
 
         with mongo_service.transaction() as session:
             assert session == mock_session
 
         mock_session.start_transaction.assert_called_once()
         mock_session.end_session.assert_called_once()
-        mongo_service.log.debug.assert_any_call("Starting MongoDB transaction")
-        mongo_service.log.debug.assert_any_call(
+        mongo_service.log.debug.assert_any_call("Starting MongoDB transaction")  # type: ignore[attr-defined]
+        mongo_service.log.debug.assert_any_call(  # type: ignore[attr-defined]
             "MongoDB transaction started successfully",
         )
-        mongo_service.log.info.assert_any_call(
+        mongo_service.log.info.assert_any_call(  # type: ignore[attr-defined]
             "MongoDB transaction committed successfully",
         )
 
@@ -221,7 +240,7 @@ class TestTransactions:
         )
         mock_transaction_context.__exit__ = Mock()
         mock_session.start_transaction.return_value = mock_transaction_context
-        mongo_service._client.start_session.return_value = mock_session
+        mongo_service._client.start_session = Mock(return_value=mock_session)  # type: ignore[attr-defined]
 
         with (
             pytest.raises(Exception, match="Transaction error"),
@@ -230,7 +249,7 @@ class TestTransactions:
             pass
 
         mock_session.end_session.assert_called_once()
-        mongo_service.log.exception.assert_called_once_with(
+        mongo_service.log.exception.assert_called_once_with(  # type: ignore[attr-defined]
             "MongoDB transaction failed, rolling back",
         )
 
@@ -241,14 +260,14 @@ class TestInsertOperations:
     def test_insert_one_success(self, mongo_service: MongoService) -> None:
         """Test successful single document insertion."""
         collection_name = "test_collection"
-        document = {"name": "test", "value": 123}
+        document: dict[str, Any] = {"name": "test", "value": 123}
         inserted_id = ObjectId()
 
         mock_collection = Mock()
         mock_result = Mock(spec=InsertOneResult)
         mock_result.inserted_id = inserted_id
         mock_collection.insert_one.return_value = mock_result
-        mongo_service._db.__getitem__.return_value = mock_collection
+        mongo_service._db.__getitem__ = Mock(return_value=mock_collection)  # type: ignore[attr-defined]
 
         result = mongo_service.insert_one(collection_name, document)
 
@@ -256,11 +275,11 @@ class TestInsertOperations:
         assert result == mock_result
 
         # Verify logging
-        mongo_service.log.debug.assert_called_with(
+        mongo_service.log.debug.assert_called_with(  # type: ignore[attr-defined]
             "Inserting document into collection: %s",
             collection_name,
         )
-        mongo_service.log.info.assert_called_with(
+        mongo_service.log.info.assert_called_with(  # type: ignore[attr-defined]
             "Successfully inserted document with ID %s into collection: %s",
             inserted_id,
             collection_name,
@@ -276,7 +295,7 @@ class TestInsertOperations:
         mock_result = Mock()
         mock_result.inserted_ids = inserted_ids
         mock_collection.insert_many.return_value = mock_result
-        mongo_service._db.__getitem__.return_value = mock_collection
+        mongo_service._db.__getitem__ = Mock(return_value=mock_collection)  # type: ignore[attr-defined]
 
         result = mongo_service.insert_many(collection_name, documents)
 
@@ -288,7 +307,7 @@ class TestInsertOperations:
         assert result == inserted_ids
 
         # Verify logging
-        mongo_service.log.debug.assert_called_with(
+        mongo_service.log.debug.assert_called_with(  # type: ignore[attr-defined]
             "Inserting %d documents into collection: %s (ordered=%s)",
             2,
             collection_name,
@@ -304,11 +323,11 @@ class TestFindOperations:
         collection_name = "test_collection"
         query = {"name": "test"}
         projection = {"_id": 0}
-        expected_doc = {"_id": ObjectId(), "name": "test", "value": 123}
+        expected_doc: dict[str, Any] = {"_id": ObjectId(), "name": "test", "value": 123}
 
         mock_collection = Mock()
         mock_collection.find_one.return_value = expected_doc
-        mongo_service._db.__getitem__.return_value = mock_collection
+        mongo_service._db.__getitem__ = Mock(return_value=mock_collection)  # type: ignore[attr-defined]
 
         result = mongo_service.find_one(collection_name, query, projection)
 
@@ -320,7 +339,7 @@ class TestFindOperations:
         assert result == expected_doc
 
         # Verify logging
-        mongo_service.log.debug.assert_any_call(
+        mongo_service.log.debug.assert_any_call(  # type: ignore[attr-defined]
             "Finding document in collection: %s with query: %s",
             collection_name,
             query,
@@ -333,12 +352,12 @@ class TestFindOperations:
 
         mock_collection = Mock()
         mock_collection.find_one.return_value = None
-        mongo_service._db.__getitem__.return_value = mock_collection
+        mongo_service._db.__getitem__ = Mock(return_value=mock_collection)  # type: ignore[attr-defined]
 
         result = mongo_service.find_one(collection_name, query)
 
         assert result is None
-        mongo_service.log.debug.assert_any_call(
+        mongo_service.log.debug.assert_any_call(  # type: ignore[attr-defined]
             "No document found in collection: %s",
             collection_name,
         )
@@ -361,7 +380,7 @@ class TestFindOperations:
 
         mock_collection = Mock()
         mock_collection.find.return_value = mock_cursor
-        mongo_service._db.__getitem__.return_value = mock_collection
+        mongo_service._db.__getitem__ = Mock(return_value=mock_collection)  # type: ignore[attr-defined]
 
         result = mongo_service.find_many(
             collection_name,
@@ -379,7 +398,7 @@ class TestFindOperations:
         assert result == mock_docs
 
         # Verify logging
-        mongo_service.log.info.assert_called_with(
+        mongo_service.log.info.assert_called_with(  # type: ignore[attr-defined]
             "Found %d documents in collection: %s",
             2,
             collection_name,
@@ -401,7 +420,7 @@ class TestUpdateOperations:
         mock_result.upserted_id = None
         mock_collection = Mock()
         mock_collection.update_one.return_value = mock_result
-        mongo_service._db.__getitem__.return_value = mock_collection
+        mongo_service._db.__getitem__ = Mock(return_value=mock_collection)  # type: ignore[attr-defined]
 
         result = mongo_service.update_one(collection_name, query, update)
 
@@ -414,7 +433,7 @@ class TestUpdateOperations:
         assert result == mock_result
 
         # Verify logging
-        mongo_service.log.info.assert_called_with(
+        mongo_service.log.info.assert_called_with(  # type: ignore[attr-defined]
             "Updated %d document(s) in collection: %s (matched=%d, upserted_id=%s)",
             1,
             collection_name,
@@ -433,7 +452,7 @@ class TestUpdateOperations:
         mock_result.matched_count = 5
         mock_collection = Mock()
         mock_collection.update_many.return_value = mock_result
-        mongo_service._db.__getitem__.return_value = mock_collection
+        mongo_service._db.__getitem__ = Mock(return_value=mock_collection)  # type: ignore[attr-defined]
 
         result = mongo_service.update_many(collection_name, query, update)
 
@@ -458,7 +477,7 @@ class TestDeleteOperations:
         mock_result.deleted_count = 1
         mock_collection = Mock()
         mock_collection.delete_one.return_value = mock_result
-        mongo_service._db.__getitem__.return_value = mock_collection
+        mongo_service._db.__getitem__ = Mock(return_value=mock_collection)  # type: ignore[attr-defined]
 
         result = mongo_service.delete_one(collection_name, query)
 
@@ -466,7 +485,7 @@ class TestDeleteOperations:
         assert result == mock_result
 
         # Verify logging
-        mongo_service.log.info.assert_called_with(
+        mongo_service.log.info.assert_called_with(  # type: ignore[attr-defined]
             "Deleted %d document(s) from collection: %s",
             1,
             collection_name,
@@ -481,7 +500,7 @@ class TestDeleteOperations:
         mock_result.deleted_count = 3
         mock_collection = Mock()
         mock_collection.delete_many.return_value = mock_result
-        mongo_service._db.__getitem__.return_value = mock_collection
+        mongo_service._db.__getitem__ = Mock(return_value=mock_collection)  # type: ignore[attr-defined]
 
         result = mongo_service.delete_many(collection_name, query)
 
@@ -500,7 +519,7 @@ class TestAggregationOperations:
 
         mock_collection = Mock()
         mock_collection.count_documents.return_value = expected_count
-        mongo_service._db.__getitem__.return_value = mock_collection
+        mongo_service._db.__getitem__ = Mock(return_value=mock_collection)  # type: ignore[attr-defined]
 
         result = mongo_service.count_documents(collection_name, query)
 
@@ -508,7 +527,7 @@ class TestAggregationOperations:
         assert result == expected_count
 
         # Verify logging
-        mongo_service.log.debug.assert_any_call(
+        mongo_service.log.debug.assert_any_call(  # type: ignore[attr-defined]
             "Found %d documents matching query in collection: %s",
             expected_count,
             collection_name,
@@ -517,11 +536,11 @@ class TestAggregationOperations:
     def test_aggregate_success(self, mongo_service: MongoService) -> None:
         """Test successful aggregation pipeline."""
         collection_name = "test_collection"
-        pipeline = [
+        pipeline: list[dict[str, Any]] = [
             {"$match": {"status": "active"}},
             {"$group": {"_id": "$category", "count": {"$sum": 1}}},
         ]
-        expected_result = [
+        expected_result: list[dict[str, Any]] = [
             {"_id": "electronics", "count": 10},
             {"_id": "books", "count": 5},
         ]
@@ -530,7 +549,7 @@ class TestAggregationOperations:
         mock_cursor.__iter__ = Mock(return_value=iter(expected_result))
         mock_collection = Mock()
         mock_collection.aggregate.return_value = mock_cursor
-        mongo_service._db.__getitem__.return_value = mock_collection
+        mongo_service._db.__getitem__ = Mock(return_value=mock_collection)  # type: ignore[attr-defined]
 
         result = mongo_service.aggregate(collection_name, pipeline)
 
@@ -538,7 +557,7 @@ class TestAggregationOperations:
         assert result == expected_result
 
         # Verify logging
-        mongo_service.log.info.assert_called_with(
+        mongo_service.log.info.assert_called_with(  # type: ignore[attr-defined]
             "Aggregation completed on collection: %s, returned %d results",
             collection_name,
             2,
@@ -556,7 +575,7 @@ class TestIndexOperations:
 
         mock_collection = Mock()
         mock_collection.create_index.return_value = expected_index_name
-        mongo_service._db.__getitem__.return_value = mock_collection
+        mongo_service._db.__getitem__ = Mock(return_value=mock_collection)  # type: ignore[attr-defined]
 
         result = mongo_service.create_index(collection_name, keys)
 
@@ -564,7 +583,7 @@ class TestIndexOperations:
         assert result == expected_index_name
 
         # Verify logging
-        mongo_service.log.info.assert_called_with(
+        mongo_service.log.info.assert_called_with(  # type: ignore[attr-defined]
             "Successfully created index '%s' on collection: %s",
             expected_index_name,
             collection_name,
@@ -578,7 +597,7 @@ class TestIndexOperations:
 
         mock_collection = Mock()
         mock_collection.create_index.return_value = expected_index_name
-        mongo_service._db.__getitem__.return_value = mock_collection
+        mongo_service._db.__getitem__ = Mock(return_value=mock_collection)  # type: ignore[attr-defined]
 
         result = mongo_service.create_index(collection_name, keys, unique=True)
 
@@ -594,7 +613,7 @@ class TestBulkOperations:
         from pymongo.operations import DeleteOne, InsertOne, UpdateOne
 
         collection_name = "test_collection"
-        operations = [
+        operations = [  # type: ignore[var-annotated]
             InsertOne({"name": "doc1"}),
             UpdateOne({"_id": 1}, {"$set": {"updated": True}}),
             DeleteOne({"_id": 2}),
@@ -608,9 +627,9 @@ class TestBulkOperations:
         mock_result.deleted_count = 1
         mock_result.upserted_count = 0
         mock_collection.bulk_write.return_value = mock_result
-        mongo_service._db.__getitem__.return_value = mock_collection
+        mongo_service._db.__getitem__ = Mock(return_value=mock_collection)  # type: ignore[attr-defined]
 
-        result = mongo_service.bulk_write(collection_name, operations)
+        result = mongo_service.bulk_write(collection_name, operations)  # type: ignore[arg-type]
 
         mock_collection.bulk_write.assert_called_once_with(
             operations,
@@ -620,7 +639,7 @@ class TestBulkOperations:
         assert result == mock_result
 
         # Verify logging
-        mongo_service.log.info.assert_called_with(
+        mongo_service.log.info.assert_called_with(  # type: ignore[attr-defined]
             "Bulk write completed on collection: %s - "
             "inserted: %d, matched: %d, modified: %d, deleted: %d, upserted: %d",
             collection_name,
@@ -645,7 +664,7 @@ class TestErrorHandling:
 
         mock_collection = Mock()
         mock_collection.insert_one.side_effect = ConnectionFailure("Connection lost")
-        mongo_service._db.__getitem__.return_value = mock_collection
+        mongo_service._db.__getitem__ = Mock(return_value=mock_collection)  # type: ignore[attr-defined]
 
         with pytest.raises(ConnectionFailure):
             mongo_service.insert_one(collection_name, document)
@@ -657,7 +676,7 @@ class TestErrorHandling:
 
         mock_collection = Mock()
         mock_collection.insert_one.side_effect = OperationFailure("Insert failed")
-        mongo_service._db.__getitem__.return_value = mock_collection
+        mongo_service._db.__getitem__ = Mock(return_value=mock_collection)  # type: ignore[attr-defined]
 
         with pytest.raises(OperationFailure):
             mongo_service.insert_one(collection_name, document)
@@ -665,19 +684,19 @@ class TestErrorHandling:
     def test_close_connection(self, mongo_service: MongoService) -> None:
         """Test closing MongoDB connection."""
         mongo_service.close()
-        mongo_service._client.close.assert_called_once()
-        mongo_service.log.info.assert_called_with(
+        mongo_service._client.close.assert_called_once()  # type: ignore[attr-defined,misc]
+        mongo_service.log.info.assert_called_with(  # type: ignore[attr-defined]
             "MongoDB connection closed successfully",
         )
 
     def test_close_connection_with_error(self, mongo_service: MongoService) -> None:
         """Test error handling when closing connection fails."""
-        mongo_service._client.close.side_effect = Exception("Close failed")
+        mongo_service._client.close.side_effect = Exception("Close failed")  # type: ignore[attr-defined,misc]
 
         with pytest.raises(Exception, match="Close failed"):
             mongo_service.close()
 
-        mongo_service.log.exception.assert_called_with(
+        mongo_service.log.exception.assert_called_with(  # type: ignore[attr-defined]
             "Error closing MongoDB connection",
         )
 
@@ -694,7 +713,7 @@ class TestEdgeCases:
         mock_cursor.__iter__ = Mock(return_value=iter([]))
         mock_collection = Mock()
         mock_collection.find.return_value = mock_cursor
-        mongo_service._db.__getitem__.return_value = mock_collection
+        mongo_service._db.__getitem__ = Mock(return_value=mock_collection)  # type: ignore[attr-defined]
 
         result = mongo_service.find_many(collection_name, query)
 
@@ -712,7 +731,7 @@ class TestEdgeCases:
         mock_result.upserted_id = None
         mock_collection = Mock()
         mock_collection.update_one.return_value = mock_result
-        mongo_service._db.__getitem__.return_value = mock_collection
+        mongo_service._db.__getitem__ = Mock(return_value=mock_collection)  # type: ignore[attr-defined]
 
         result = mongo_service.update_one(collection_name, query, update)
 
@@ -728,7 +747,7 @@ class TestEdgeCases:
         mock_result.deleted_count = 0
         mock_collection = Mock()
         mock_collection.delete_one.return_value = mock_result
-        mongo_service._db.__getitem__.return_value = mock_collection
+        mongo_service._db.__getitem__ = Mock(return_value=mock_collection)  # type: ignore[attr-defined]
 
         result = mongo_service.delete_one(collection_name, query)
 
