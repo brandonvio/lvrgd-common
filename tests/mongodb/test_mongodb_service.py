@@ -1,23 +1,33 @@
+"""Comprehensive test suite for MongoDB service implementation.
+
+This module contains extensive tests for the MongoDB service including:
+- Connection initialization and configuration
+- CRUD operations
+- Transaction handling
+- Error handling and retry logic
+- Bulk operations
+- Aggregation and pagination
+- Performance metrics collection
+"""
+
 import logging
+from unittest.mock import Mock, patch
 import pytest
-from unittest.mock import Mock, MagicMock, patch, call
 from bson.objectid import ObjectId
 from pymongo.errors import (
     ConnectionFailure,
     OperationFailure,
     AutoReconnect,
-    NetworkTimeout,
 )
 from pymongo.results import InsertOneResult, UpdateResult, DeleteResult, BulkWriteResult
 from pymongo.operations import InsertOne, UpdateOne, DeleteOne
 
-from mongodb.mongodb_service import (
+from services.mongodb.mongodb_service import (
     MongoService,
     MongoOperationError,
-    OperationMetrics,
     HealthCheck,
 )
-from mongodb.mongodb_models import MongoConfig
+from services.mongodb.mongodb_models import MongoConfig
 
 
 @pytest.fixture
@@ -48,7 +58,7 @@ def config_without_auth():
 @pytest.fixture
 def mock_mongo_client():
     """Create a mock MongoDB client."""
-    with patch("mongodb.mongodb_service.MongoClient") as mock_client:
+    with patch("services.mongodb.mongodb_service.MongoClient") as mock_client:
         yield mock_client
 
 
@@ -194,7 +204,9 @@ class TestTransactions:
         """Test transaction rollback on error."""
         mock_session = Mock()
         mock_transaction_context = Mock()
-        mock_transaction_context.__enter__ = Mock(side_effect=Exception("Transaction error"))
+        mock_transaction_context.__enter__ = Mock(
+            side_effect=Exception("Transaction error")
+        )
         mock_transaction_context.__exit__ = Mock()
         mock_session.start_transaction.return_value = mock_transaction_context
         mongo_service._client.start_session.return_value = mock_session
@@ -262,7 +274,9 @@ class TestFindOperations:
 
         result = mongo_service.find_one(collection_name, query, projection)
 
-        mock_collection.find_one.assert_called_once_with(query, projection, session=None)
+        mock_collection.find_one.assert_called_once_with(
+            query, projection, session=None
+        )
         assert result == expected_doc
 
     def test_find_one_not_found(self, mongo_service):
@@ -357,7 +371,9 @@ class TestUpdateOperations:
 
         result = mongo_service.update_one(collection_name, query, update)
 
-        mock_collection.update_one.assert_called_once_with(query, update, upsert=False, session=None)
+        mock_collection.update_one.assert_called_once_with(
+            query, update, upsert=False, session=None
+        )
         assert result == mock_result
 
     def test_update_one_with_upsert(self, mongo_service):
@@ -373,7 +389,9 @@ class TestUpdateOperations:
 
         result = mongo_service.update_one(collection_name, query, update, upsert=True)
 
-        mock_collection.update_one.assert_called_once_with(query, update, upsert=True, session=None)
+        mock_collection.update_one.assert_called_once_with(
+            query, update, upsert=True, session=None
+        )
 
     def test_update_one_by_id_success(self, mongo_service):
         """Test successful update by ID."""
@@ -389,7 +407,9 @@ class TestUpdateOperations:
         result = mongo_service.update_one_by_id(collection_name, doc_id, update)
 
         expected_query = {"_id": ObjectId(doc_id)}
-        mock_collection.update_one.assert_called_once_with(expected_query, update, session=None)
+        mock_collection.update_one.assert_called_once_with(
+            expected_query, update, session=None
+        )
         assert result == mock_result
 
     def test_update_many_success(self, mongo_service):
@@ -406,7 +426,9 @@ class TestUpdateOperations:
 
         result = mongo_service.update_many(collection_name, query, update)
 
-        mock_collection.update_many.assert_called_once_with(query, update, upsert=False, session=None)
+        mock_collection.update_many.assert_called_once_with(
+            query, update, upsert=False, session=None
+        )
         assert result == mock_result
 
 
@@ -527,7 +549,7 @@ class TestErrorHandling:
 
     def test_connection_failure(self, mock_logger, valid_config):
         """Test handling of connection failures."""
-        with patch("mongodb.mongodb_service.MongoClient") as mock_client:
+        with patch("services.mongodb.mongodb_service.MongoClient") as mock_client:
             mock_client.side_effect = ConnectionFailure("Connection failed")
 
             with pytest.raises(ConnectionFailure):
@@ -813,7 +835,7 @@ class TestMetricsAndMonitoring:
     def test_performance_summary(self, mongo_service):
         """Test performance summary generation."""
         # Add some mock metrics
-        from mongodb.mongodb_service import OperationMetrics
+        from services.mongodb.mongodb_service import OperationMetrics
 
         mongo_service._metrics = [
             OperationMetrics("insert_one", "users", 10.5, 1, True),
@@ -833,7 +855,7 @@ class TestMetricsAndMonitoring:
 
     def test_clear_metrics_after_read(self, mongo_service):
         """Test clearing metrics after reading."""
-        from mongodb.mongodb_service import OperationMetrics
+        from services.mongodb.mongodb_service import OperationMetrics
 
         mongo_service._metrics = [
             OperationMetrics("insert_one", "users", 10.5, 1, True)

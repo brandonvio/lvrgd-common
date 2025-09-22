@@ -24,3 +24,14 @@ dev = [
     "pytest-asyncio>=1.2.0",
     "pytest-mock>=3.15.1",
 ]
+
+[tool.ruff]
+select = ["ALL"]
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+packages = ["services"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

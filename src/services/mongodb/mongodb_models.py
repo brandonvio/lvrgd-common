@@ -1,3 +1,9 @@
+"""MongoDB configuration models for database connections.
+
+This module provides Pydantic models for configuring MongoDB connections
+with validation and sensible defaults for production use.
+"""
+
 from typing import Optional
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 

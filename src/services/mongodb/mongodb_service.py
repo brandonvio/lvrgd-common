@@ -1,3 +1,14 @@
+"""Enhanced MongoDB service with comprehensive error handling and monitoring.
+
+This module provides a robust MongoDB service implementation with features including:
+- Automatic retry logic for transient failures
+- Connection pooling and health checks
+- Transaction support
+- Performance metrics collection
+- Bulk operations
+- Pagination and aggregation utilities
+"""
+
 import logging
 import time
 from contextlib import contextmanager
