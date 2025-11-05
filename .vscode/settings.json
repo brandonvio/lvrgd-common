@@ -4,5 +4,8 @@
     ],
     "python.autoComplete.extraPaths": [
         "${workspaceFolder}/src"
+    ],
+    "cursorpyright.analysis.extraPaths": [
+        "${workspaceFolder}/src"
     ]
 }
