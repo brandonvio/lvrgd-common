@@ -11,7 +11,7 @@ from minio.error import S3Error
 from services.minio.minio_models import MinioConfig
 from services.minio.minio_service import ERROR_BUCKET_REQUIRED, MinioService
 
-# ruff: noqa: S101,SLF001,ARG001,ARG002,S106,FBT003,PLC0415
+# ruff: noqa: S101, S106
 
 
 @pytest.fixture
@@ -36,7 +36,8 @@ def valid_config() -> MinioConfig:
 
 @pytest.fixture
 def service_with_client(
-    mock_logger: Mock, valid_config: MinioConfig
+    mock_logger: Mock,
+    valid_config: MinioConfig,
 ) -> tuple[MinioService, Mock]:
     """Create a MinioService instance with a mocked client."""
     with patch("services.minio.minio_service.Minio") as minio_ctor:
@@ -50,7 +51,9 @@ class TestInitialization:
     """Verify service construction and configuration handling."""
 
     def test_initializes_client_with_expected_arguments(
-        self, mock_logger: Mock, valid_config: MinioConfig
+        self,
+        mock_logger: Mock,
+        valid_config: MinioConfig,
     ) -> None:
         """Ensure the MinIO client receives the correct parameters."""
         with patch("services.minio.minio_service.Minio") as minio_ctor:
@@ -71,7 +74,9 @@ class TestInitialization:
             assert service.log is mock_logger
 
     def test_auto_creates_bucket_when_configured(
-        self, mock_logger: Mock, valid_config: MinioConfig
+        self,
+        mock_logger: Mock,
+        valid_config: MinioConfig,
     ) -> None:
         """Auto-creation should invoke bucket creation workflow."""
         config = valid_config.model_copy(update={"auto_create_bucket": True})
@@ -85,28 +90,43 @@ class TestInitialization:
 
             client_instance.bucket_exists.assert_called_once_with(config.default_bucket)
             client_instance.make_bucket.assert_called_once_with(
-                config.default_bucket, location=config.region
+                config.default_bucket,
+                location=config.region,
             )
 
     def test_init_logs_and_re_raises_on_failure(
-        self, mock_logger: Mock, valid_config: MinioConfig
+        self,
+        mock_logger: Mock,
+        valid_config: MinioConfig,
     ) -> None:
         """Errors during initialization should be logged and propagated."""
-        with patch(
-            "services.minio.minio_service.Minio",
-            side_effect=S3Error("code", "message", "request", "resource"),
+        with (
+            patch(
+                "services.minio.minio_service.Minio",
+                side_effect=S3Error(
+                    "code",
+                    "message",
+                    "resource",
+                    "request-id",
+                    "host-id",
+                    "response",
+                ),
+            ),
+            pytest.raises(S3Error),
         ):
-            with pytest.raises(S3Error):
-                MinioService(mock_logger, valid_config)
+            MinioService(mock_logger, valid_config)
 
-        mock_logger.exception.assert_called_once_with("Failed to initialize MinIO client")
+        mock_logger.exception.assert_called_once_with(
+            "Failed to initialize MinIO client"
+        )
 
 
 class TestHealthAndBuckets:
     """Exercise health check and bucket utility methods."""
 
     def test_health_check_success(
-        self, service_with_client: tuple[MinioService, Mock]
+        self,
+        service_with_client: tuple[MinioService, Mock],
     ) -> None:
         """Health check should return bucket names on success."""
         service, client = service_with_client
@@ -121,11 +141,19 @@ class TestHealthAndBuckets:
         client.list_buckets.assert_called_once_with()
 
     def test_health_check_failure_logs_and_raises(
-        self, service_with_client: tuple[MinioService, Mock]
+        self,
+        service_with_client: tuple[MinioService, Mock],
     ) -> None:
         """Propagate S3 errors from the health check."""
         service, client = service_with_client
-        client.list_buckets.side_effect = S3Error("code", "message", "request", "resource")
+        client.list_buckets.side_effect = S3Error(
+            "code",
+            "message",
+            "resource",
+            "request-id",
+            "host-id",
+            "response",
+        )
 
         with pytest.raises(S3Error):
             service.health_check()
@@ -133,7 +161,8 @@ class TestHealthAndBuckets:
         service.log.exception.assert_called_once_with("MinIO health check failed")
 
     def test_bucket_exists_delegates_to_client(
-        self, service_with_client: tuple[MinioService, Mock]
+        self,
+        service_with_client: tuple[MinioService, Mock],
     ) -> None:
         """bucket_exists should call the underlying client."""
         service, client = service_with_client
@@ -143,7 +172,8 @@ class TestHealthAndBuckets:
         client.bucket_exists.assert_called_once_with("sample")
 
     def test_ensure_bucket_skips_when_present(
-        self, service_with_client: tuple[MinioService, Mock]
+        self,
+        service_with_client: tuple[MinioService, Mock],
     ) -> None:
         """ensure_bucket should avoid creating existing buckets."""
         service, client = service_with_client
@@ -155,7 +185,8 @@ class TestHealthAndBuckets:
         client.make_bucket.assert_not_called()
 
     def test_ensure_bucket_creates_when_missing(
-        self, service_with_client: tuple[MinioService, Mock]
+        self,
+        service_with_client: tuple[MinioService, Mock],
     ) -> None:
         """Missing buckets should be created."""
         service, client = service_with_client
@@ -164,10 +195,13 @@ class TestHealthAndBuckets:
         service.ensure_bucket("new-bucket")
 
         client.bucket_exists.assert_called_once_with("new-bucket")
-        client.make_bucket.assert_called_once_with("new-bucket", location=service.config.region)
+        client.make_bucket.assert_called_once_with(
+            "new-bucket", location=service.config.region
+        )
 
     def test_list_buckets_returns_names(
-        self, service_with_client: tuple[MinioService, Mock]
+        self,
+        service_with_client: tuple[MinioService, Mock],
     ) -> None:
         """list_buckets should return plain bucket names."""
         service, client = service_with_client
@@ -181,11 +215,14 @@ class TestObjectOperations:
     """Validate object-level operations."""
 
     def test_upload_file_uses_resolved_bucket(
-        self, service_with_client: tuple[MinioService, Mock]
+        self,
+        service_with_client: tuple[MinioService, Mock],
     ) -> None:
         """Uploading files should return the object name."""
         service, client = service_with_client
-        client.fput_object.return_value = SimpleNamespace(object_name="uploaded.txt", etag="etag")
+        client.fput_object.return_value = SimpleNamespace(
+            object_name="uploaded.txt", etag="etag"
+        )
 
         result = service.upload_file(
             object_name="uploaded.txt",
@@ -204,21 +241,27 @@ class TestObjectOperations:
         )
 
     def test_download_file_invokes_client(
-        self, service_with_client: tuple[MinioService, Mock]
+        self,
+        service_with_client: tuple[MinioService, Mock],
     ) -> None:
         """Downloading files should call fget_object."""
         service, client = service_with_client
 
         service.download_file("object.txt", "/tmp/output.txt")
 
-        client.fget_object.assert_called_once_with("test-bucket", "object.txt", "/tmp/output.txt")
+        client.fget_object.assert_called_once_with(
+            "test-bucket", "object.txt", "/tmp/output.txt"
+        )
 
     def test_upload_data_returns_object_name(
-        self, service_with_client: tuple[MinioService, Mock]
+        self,
+        service_with_client: tuple[MinioService, Mock],
     ) -> None:
         """Uploading byte payloads should delegate to put_object."""
         service, client = service_with_client
-        client.put_object.return_value = SimpleNamespace(object_name="payload.bin", etag="etag")
+        client.put_object.return_value = SimpleNamespace(
+            object_name="payload.bin", etag="etag"
+        )
 
         result = service.upload_data("payload.bin", b"hello world")
 
@@ -230,7 +273,8 @@ class TestObjectOperations:
         assert kwargs["metadata"] is None
 
     def test_download_data_closes_response(
-        self, service_with_client: tuple[MinioService, Mock]
+        self,
+        service_with_client: tuple[MinioService, Mock],
     ) -> None:
         """download_data should clean up the response object."""
         service, client = service_with_client
@@ -246,19 +290,26 @@ class TestObjectOperations:
         response.release_conn.assert_called_once_with()
 
     def test_list_objects_returns_names(
-        self, service_with_client: tuple[MinioService, Mock]
+        self,
+        service_with_client: tuple[MinioService, Mock],
     ) -> None:
         """list_objects should iterate over returned objects."""
         service, client = service_with_client
         client.list_objects.return_value = iter(
-            [SimpleNamespace(object_name="file-1"), SimpleNamespace(object_name="file-2")]
+            [
+                SimpleNamespace(object_name="file-1"),
+                SimpleNamespace(object_name="file-2"),
+            ],
         )
 
         assert service.list_objects(prefix="", recursive=False) == ["file-1", "file-2"]
-        client.list_objects.assert_called_once_with("test-bucket", prefix="", recursive=False)
+        client.list_objects.assert_called_once_with(
+            "test-bucket", prefix="", recursive=False
+        )
 
     def test_remove_object_invokes_client(
-        self, service_with_client: tuple[MinioService, Mock]
+        self,
+        service_with_client: tuple[MinioService, Mock],
     ) -> None:
         """remove_object should call the client with resolved bucket."""
         service, client = service_with_client
@@ -268,7 +319,8 @@ class TestObjectOperations:
         client.remove_object.assert_called_once_with("test-bucket", "delete-me.txt")
 
     def test_generate_presigned_url(
-        self, service_with_client: tuple[MinioService, Mock]
+        self,
+        service_with_client: tuple[MinioService, Mock],
     ) -> None:
         """Presigned URLs should be generated via the client."""
         service, client = service_with_client
@@ -286,7 +338,8 @@ class TestObjectOperations:
         client.get_presigned_url.assert_called_once()
 
     def test_stat_object_returns_metadata(
-        self, service_with_client: tuple[MinioService, Mock]
+        self,
+        service_with_client: tuple[MinioService, Mock],
     ) -> None:
         """stat_object should return the metadata returned by the client."""
         service, client = service_with_client
@@ -299,7 +352,9 @@ class TestObjectOperations:
         client.stat_object.assert_called_once_with("custom", "file.txt")
 
     def test_operations_require_bucket_when_no_default(
-        self, mock_logger: Mock, valid_config: MinioConfig
+        self,
+        mock_logger: Mock,
+        valid_config: MinioConfig,
     ) -> None:
         """Calling object operations without a bucket should raise when no default exists."""
         config = valid_config.model_copy(update={"default_bucket": None})

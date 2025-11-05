@@ -7,8 +7,8 @@ Analyze all staged and unstaged changes, generate a concise commit message follo
 
 Steps:
 Validation!
-1. Run `flake8` and resovle all linting errors.
-2. For each Python file modified in branch... run `black` on that file.
+1. Run `ruff check --fix` to lint and auto-fix issues.
+2. Run `ruff format` to format all Python files.
 3. Do not proceed until validation successfully passes.
 
 Commit!

@@ -90,7 +90,9 @@ class MinioConfig(BaseModel):
     @field_validator("default_bucket")
     @classmethod
     def validate_default_bucket(
-        cls, value: str | None, info: ValidationInfo
+        cls,
+        value: str | None,
+        info: ValidationInfo,
     ) -> str | None:
         """Validate bucket naming rules when a default bucket is provided."""
         if value is None:
@@ -127,5 +129,5 @@ class MinioConfig(BaseModel):
                 "default_bucket": "application-data",
                 "auto_create_bucket": True,
             },
-        }
+        },
     )

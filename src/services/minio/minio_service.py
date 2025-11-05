@@ -13,7 +13,9 @@ from minio.error import S3Error
 from .minio_models import MinioConfig
 
 # Error messages
-ERROR_BUCKET_REQUIRED = "Bucket name must be provided when no default bucket is configured"
+ERROR_BUCKET_REQUIRED = (
+    "Bucket name must be provided when no default bucket is configured"
+)
 
 
 class MinioService:
@@ -40,7 +42,9 @@ class MinioService:
                 if config.auto_create_bucket:
                     self.ensure_bucket(config.default_bucket)
                 else:
-                    self.log.debug("Using configured default bucket: %s", config.default_bucket)
+                    self.log.debug(
+                        "Using configured default bucket: %s", config.default_bucket
+                    )
 
         except Exception:
             self.log.exception("Failed to initialize MinIO client")
@@ -115,7 +119,10 @@ class MinioService:
         """Upload a file from disk to the specified bucket."""
         resolved_bucket = self._resolve_bucket(bucket_name)
         self.log.debug(
-            "Uploading file '%s' to bucket '%s' as object '%s'", file_path, resolved_bucket, object_name
+            "Uploading file '%s' to bucket '%s' as object '%s'",
+            file_path,
+            resolved_bucket,
+            object_name,
         )
         result = self._client.fput_object(
             resolved_bucket,
@@ -232,7 +239,9 @@ class MinioService:
             prefix,
             recursive,
         )
-        objects = self._client.list_objects(resolved_bucket, prefix=prefix, recursive=recursive)
+        objects = self._client.list_objects(
+            resolved_bucket, prefix=prefix, recursive=recursive
+        )
         object_names = [obj.object_name for obj in objects]
         self.log.info(
             "Found %d object(s) in bucket '%s'",
@@ -249,7 +258,9 @@ class MinioService:
     ) -> None:
         """Remove a single object from a bucket."""
         resolved_bucket = self._resolve_bucket(bucket_name)
-        self.log.debug("Removing object '%s' from bucket '%s'", object_name, resolved_bucket)
+        self.log.debug(
+            "Removing object '%s' from bucket '%s'", object_name, resolved_bucket
+        )
         self._client.remove_object(resolved_bucket, object_name)
         self.log.info(
             "Removed object '%s' from bucket '%s'",
