@@ -43,7 +43,8 @@ class MinioService:
                     self.ensure_bucket(config.default_bucket)
                 else:
                     self.log.debug(
-                        "Using configured default bucket: %s", config.default_bucket
+                        "Using configured default bucket: %s",
+                        config.default_bucket,
                     )
 
         except Exception:
@@ -240,7 +241,9 @@ class MinioService:
             recursive,
         )
         objects = self._client.list_objects(
-            resolved_bucket, prefix=prefix, recursive=recursive
+            resolved_bucket,
+            prefix=prefix,
+            recursive=recursive,
         )
         object_names = [obj.object_name for obj in objects]
         self.log.info(
@@ -259,7 +262,9 @@ class MinioService:
         """Remove a single object from a bucket."""
         resolved_bucket = self._resolve_bucket(bucket_name)
         self.log.debug(
-            "Removing object '%s' from bucket '%s'", object_name, resolved_bucket
+            "Removing object '%s' from bucket '%s'",
+            object_name,
+            resolved_bucket,
         )
         self._client.remove_object(resolved_bucket, object_name)
         self.log.info(

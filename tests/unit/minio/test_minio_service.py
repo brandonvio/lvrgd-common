@@ -117,7 +117,7 @@ class TestInitialization:
             MinioService(mock_logger, valid_config)
 
         mock_logger.exception.assert_called_once_with(
-            "Failed to initialize MinIO client"
+            "Failed to initialize MinIO client",
         )
 
 
@@ -196,7 +196,8 @@ class TestHealthAndBuckets:
 
         client.bucket_exists.assert_called_once_with("new-bucket")
         client.make_bucket.assert_called_once_with(
-            "new-bucket", location=service.config.region
+            "new-bucket",
+            location=service.config.region,
         )
 
     def test_list_buckets_returns_names(
@@ -221,7 +222,8 @@ class TestObjectOperations:
         """Uploading files should return the object name."""
         service, client = service_with_client
         client.fput_object.return_value = SimpleNamespace(
-            object_name="uploaded.txt", etag="etag"
+            object_name="uploaded.txt",
+            etag="etag",
         )
 
         result = service.upload_file(
@@ -250,7 +252,9 @@ class TestObjectOperations:
         service.download_file("object.txt", "/tmp/output.txt")
 
         client.fget_object.assert_called_once_with(
-            "test-bucket", "object.txt", "/tmp/output.txt"
+            "test-bucket",
+            "object.txt",
+            "/tmp/output.txt",
         )
 
     def test_upload_data_returns_object_name(
@@ -260,7 +264,8 @@ class TestObjectOperations:
         """Uploading byte payloads should delegate to put_object."""
         service, client = service_with_client
         client.put_object.return_value = SimpleNamespace(
-            object_name="payload.bin", etag="etag"
+            object_name="payload.bin",
+            etag="etag",
         )
 
         result = service.upload_data("payload.bin", b"hello world")
@@ -304,7 +309,9 @@ class TestObjectOperations:
 
         assert service.list_objects(prefix="", recursive=False) == ["file-1", "file-2"]
         client.list_objects.assert_called_once_with(
-            "test-bucket", prefix="", recursive=False
+            "test-bucket",
+            prefix="",
+            recursive=False,
         )
 
     def test_remove_object_invokes_client(
