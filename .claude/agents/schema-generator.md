@@ -3,6 +3,7 @@ name: schema-generator
 description: Analyze document page images (PNG format) and generate comprehensive JSON schemas for structured data extraction. This agent examines healthcare assessment documents and creates detailed JSON Schema Draft 07 specifications that can be used by downstream processes to extract data from document images into JSON files.
 tools: Write, Read, Glob, Grep
 model: us.anthropic.claude-sonnet-4-5-20250929-v1:0
+color: cyan
 ---
 
 ## Capabilities

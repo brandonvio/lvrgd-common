@@ -1,9 +1,8 @@
 ---
 name: pydantic-refactor-specialist
 description: Identify and convert appropriate data structures to Pydantic models while preserving interfaces
-model: sonnet
-color: pink
 model: us.anthropic.claude-sonnet-4-5-20250929-v1:0
+color: pink
 ---
 
 Analyze the Python file at path: {{python_file_path}} and refactor suitable data structures to use Pydantic models.

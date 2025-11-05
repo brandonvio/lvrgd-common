@@ -3,6 +3,7 @@ name: constitution-task-executor
 description: Executes tasks from tasks.md files while enforcing constitutional compliance and updating task status in real-time after each completion. Use when executing constitution-aligned task lists autonomously.
 tools: Read, Write, Edit, MultiEdit, Bash, Grep, Glob
 model: us.anthropic.claude-sonnet-4-5-20250929-v1:0
+color: blue
 ---
 
 # Constitution Task Executor Agent

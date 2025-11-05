@@ -2,6 +2,7 @@
 name: claude-md-updater
 description: Git-aware documentation updater that reviews commits in the current branch and selectively updates CLAUDE.md files in folders that have been modified. Proactively maintains documentation accuracy by making minimal, surgical updates to reflect changes without rewriting existing content.
 model: us.anthropic.claude-sonnet-4-5-20250929-v1:0
+color: purple
 ---
 
 # CLAUDE.md Updater Agent

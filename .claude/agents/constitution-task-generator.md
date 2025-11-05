@@ -3,6 +3,7 @@ name: constitution-task-generator
 description: Generates actionable task lists from specifications while enforcing constitutional compliance (Radical Simplicity, Fail Fast, Type Safety, Dependency Injection, SOLID principles). Use when breaking down features or specs into implementation tasks.
 tools: Read, Write, Glob, Grep
 model: us.anthropic.claude-sonnet-4-5-20250929-v1:0
+color: blue
 ---
 
 # Constitution Task Generator Agent
