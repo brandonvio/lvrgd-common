@@ -1,11 +1,11 @@
 ---
 name: execute-tasks
-description: Execute tasks from a tasks.md file using the constitution-task-executor agent with real-time status updates
+description: Execute tasks from a tasks.md file using constitution-task-executor with automated constitutional code review and refinement loop
 argument-hint: "path/to/tasks-file.md"
-allowed-tools: Read, Task
+allowed-tools: Read, Task, Glob
 ---
 
-Execute tasks from a tasks.md file by invoking the constitution-task-executor agent with constitutional compliance enforcement.
+Execute tasks from a tasks.md file with automated constitutional compliance enforcement and review-refine loop until approval.
 
 ## Usage
 
@@ -16,10 +16,22 @@ Execute tasks from a tasks.md file by invoking the constitution-task-executor ag
 ## Examples
 
 ```bash
-/execute-tasks spec/feature-tasks.md
-/execute-tasks spec/parallel-pipeline-tasks.md
-/execute-tasks spec/model-by-task-tasks.md
+/execute-tasks specs/feature-tasks.md
+/execute-tasks specs/parallel-pipeline-tasks.md
+/execute-tasks specs/model-by-task-tasks.md
 ```
+
+## Overview
+
+This command implements an automated review-refine loop:
+
+1. **Execute** → Run constitution-task-executor on tasks file
+2. **Review** → Run constitution-code-reviewer on implementation
+3. **Decide**:
+   - If issues found → Generate refinement tasks (`*-r{N}-tasks.md`) and loop back to step 1
+   - If approved → Generate approval doc (`*-r{N}-approval.md`) and exit
+
+This continues until code meets all constitutional requirements.
 
 ## Steps
 
@@ -43,40 +55,239 @@ If TASKS_FILE doesn't end with "-tasks.md":
   Exit
 ```
 
-### 2. Invoke Agent
-
-Invoke the **constitution-task-executor** agent with:
+### 2. Initialize Loop Variables
 
 ```
-Execute ALL tasks from the file: $TASKS_FILE
-
-PRIMARY MANDATE: Execute ALL tasks from start to finish WITHOUT stopping for user confirmation. Work autonomously through the entire task list.
-
-1. Read @.claude/constitution.md
-2. Load tasks from $TASKS_FILE
-3. Execute ALL tasks sequentially (NO STOPPING, NO CONFIRMATION)
-4. Update checkbox IMMEDIATELY after each task: - [x] N. Task description
-5. Apply all constitutional principles to every implementation decision:
-   - Radical Simplicity
-   - Fail Fast
-   - Type Safety
-   - Structured Data Models
-   - Unit Testing with Mocking
-   - Dependency Injection
-   - SOLID Principles
-
-CRITICAL: Update checkboxes in real-time after EACH task. Never batch updates. Keep moving forward autonomously.
-
-After completing ALL tasks, provide brief summary:
-- Total tasks completed
-- Constitutional compliance confirmed
-- Key files created/modified
+CURRENT_TASKS_FILE = $TASKS_FILE
+ITERATION = 0
+MAX_ITERATIONS = 5
+APPROVED = false
 ```
 
-### 3. Report Success
+### 3. Review-Refine Loop
 
-After agent completes:
-- Display success message
-- Confirm tasks file location
-- Suggest reviewing tasks.md file for completion status
-- Recommend running full test suite
+Execute the following loop until approval or max iterations:
+
+```
+WHILE NOT APPROVED AND ITERATION < MAX_ITERATIONS:
+  ITERATION = ITERATION + 1
+
+  Display: "═══════════════════════════════════════════════════════"
+  Display: "Iteration {ITERATION}: Executing tasks..."
+  Display: "Task File: {CURRENT_TASKS_FILE}"
+  Display: "═══════════════════════════════════════════════════════"
+
+  # Step 3a: Execute Tasks
+  Invoke constitution-task-executor with:
+    Execute ALL tasks from: {CURRENT_TASKS_FILE}
+
+    PRIMARY MANDATE: Execute ALL tasks from start to finish WITHOUT stopping.
+
+    1. Read @.claude/constitution.md
+    2. Load tasks from {CURRENT_TASKS_FILE}
+    3. Execute ALL tasks sequentially (NO STOPPING, NO CONFIRMATION)
+    4. Update EVERY checkbox IMMEDIATELY after completion:
+       - Quick Task Checklist
+       - Constitutional Compliance checks
+       - Code Quality Gates
+       - Success Criteria
+       - All other checkboxes throughout document
+    5. Apply all 7 constitutional principles:
+       - I. Radical Simplicity
+       - II. Fail Fast
+       - III. Type Safety
+       - IV. Structured Data Models
+       - V. Unit Testing with Mocking
+       - VI. Dependency Injection (all REQUIRED)
+       - VII. SOLID Principles
+
+    CRITICAL: Update ALL checkboxes in real-time. If can't check box, explain why.
+
+  Display: "Task execution complete."
+  Display: ""
+
+  # Step 3b: Review Implementation
+  Display: "═══════════════════════════════════════════════════════"
+  Display: "Running constitutional code review..."
+  Display: "═══════════════════════════════════════════════════════"
+
+  Invoke constitution-code-reviewer with:
+    Review implementation from tasks file: {CURRENT_TASKS_FILE}
+
+    PRIMARY MANDATE: Comprehensive constitutional audit of all implemented code.
+
+    1. Read @.claude/constitution.md
+    2. Read specification file (derive from tasks file path)
+    3. Read tasks file: {CURRENT_TASKS_FILE}
+    4. Identify all implemented files (from completion summary)
+    5. Audit EVERY file against 7 constitutional principles
+    6. Verify ALL requirements implemented
+    7. Validate ALL checkboxes addressed
+    8. Generate output:
+       - If issues found: Create {basename}-r{iteration}-tasks.md
+       - If approved: Create {basename}-r{iteration}-approval.md
+
+    Be thorough. Enforce constitution rigorously. Acknowledge documented deviations.
+
+  Display: "Code review complete."
+  Display: ""
+
+  # Step 3c: Check Review Result
+
+  # Derive basename from current tasks file
+  # Examples:
+  #   specs/feature-tasks.md → basename = "feature"
+  #   specs/feature-r1-tasks.md → basename = "feature"
+  #   specs/feature-r2-tasks.md → basename = "feature"
+
+  BASENAME = extract basename from CURRENT_TASKS_FILE (remove "-tasks.md" and any "-r{N}" suffix)
+  DIRECTORY = directory of CURRENT_TASKS_FILE
+
+  APPROVAL_FILE = "{DIRECTORY}/{BASENAME}-r{ITERATION}-approval.md"
+  REFINEMENT_FILE = "{DIRECTORY}/{BASENAME}-r{ITERATION}-tasks.md"
+
+  # Check which file was created
+  If APPROVAL_FILE exists:
+    APPROVED = true
+    Display: "═══════════════════════════════════════════════════════"
+    Display: "✅ CONSTITUTIONAL APPROVAL GRANTED"
+    Display: "═══════════════════════════════════════════════════════"
+    Display: "Approval Document: {APPROVAL_FILE}"
+    Display: "All constitutional requirements met."
+    Display: "Implementation ready for deployment."
+    Break loop
+
+  Else If REFINEMENT_FILE exists:
+    Display: "═══════════════════════════════════════════════════════"
+    Display: "⚠️  Issues Found - Refinement Required"
+    Display: "═══════════════════════════════════════════════════════"
+    Display: "Refinement Tasks: {REFINEMENT_FILE}"
+    Display: "Starting refinement iteration {ITERATION + 1}..."
+    Display: ""
+
+    CURRENT_TASKS_FILE = REFINEMENT_FILE
+    Continue loop
+
+  Else:
+    Display: "Error: Code reviewer did not generate output file."
+    Display: "Expected either:"
+    Display: "  - {APPROVAL_FILE} (if approved)"
+    Display: "  - {REFINEMENT_FILE} (if issues found)"
+    Exit with error
+
+END WHILE
+```
+
+### 4. Handle Loop Exit
+
+```
+If APPROVED:
+  Display: ""
+  Display: "════════════════════════════════════════════════════════════"
+  Display: "                    EXECUTION COMPLETE"
+  Display: "════════════════════════════════════════════════════════════"
+  Display: "Status: ✅ APPROVED"
+  Display: "Iterations: {ITERATION}"
+  Display: "Final Approval: {APPROVAL_FILE}"
+  Display: ""
+  Display: "Next Steps:"
+  Display: "  1. Review approval document for details"
+  Display: "  2. Run full test suite if available"
+  Display: "  3. Proceed with integration/deployment"
+  Display: "════════════════════════════════════════════════════════════"
+
+Else If ITERATION >= MAX_ITERATIONS:
+  Display: ""
+  Display: "════════════════════════════════════════════════════════════"
+  Display: "                    MAXIMUM ITERATIONS REACHED"
+  Display: "════════════════════════════════════════════════════════════"
+  Display: "Status: ⚠️  NOT APPROVED"
+  Display: "Iterations: {ITERATION}"
+  Display: "Last Task File: {CURRENT_TASKS_FILE}"
+  Display: ""
+  Display: "The implementation did not achieve constitutional approval"
+  Display: "after {MAX_ITERATIONS} iterations. This may indicate:"
+  Display: "  - Complex issues requiring manual intervention"
+  Display: "  - Specification conflicts with constitution"
+  Display: "  - Systematic implementation problems"
+  Display: ""
+  Display: "Recommended Actions:"
+  Display: "  1. Review the latest refinement tasks: {CURRENT_TASKS_FILE}"
+  Display: "  2. Manually address remaining issues"
+  Display: "  3. Consider revising specification if needed"
+  Display: "  4. Re-run /execute-tasks {CURRENT_TASKS_FILE} when ready"
+  Display: "════════════════════════════════════════════════════════════"
+  Exit
+```
+
+## Notes
+
+### Iteration Naming Convention
+
+- **Initial execution**: `specs/feature-tasks.md`
+- **First refinement**: `specs/feature-r1-tasks.md`
+- **Second refinement**: `specs/feature-r2-tasks.md`
+- **Pattern**: `specs/{basename}-r{N}-tasks.md`
+
+### Approval Naming Convention
+
+- **First iteration approval**: `specs/feature-r1-approval.md`
+- **Second iteration approval**: `specs/feature-r2-approval.md`
+- **Pattern**: `specs/{basename}-r{N}-approval.md`
+
+### Constitutional Principles Enforced
+
+All 7 principles checked on every iteration:
+1. **Radical Simplicity** - Simplest solution, no complexity
+2. **Fail Fast** - No defensive programming
+3. **Type Safety** - Type hints everywhere
+4. **Structured Data** - Pydantic/dataclasses, never dicts
+5. **Unit Testing** - Appropriate mocking strategies
+6. **Dependency Injection** - All deps REQUIRED (no Optional, no defaults)
+7. **SOLID Principles** - All five strictly applied
+
+### Max Iterations
+
+Default: 5 iterations
+- Most implementations should achieve approval in 1-2 iterations
+- 3-4 iterations suggests complex issues
+- 5 iterations without approval requires manual intervention
+
+## Example Flow
+
+**Scenario**: Executing `specs/auth-feature-tasks.md`
+
+```
+Iteration 1:
+  Execute: specs/auth-feature-tasks.md
+  Review: Code has 3 type hint violations, 1 DI issue
+  Output: specs/auth-feature-r1-tasks.md (refinement required)
+
+Iteration 2:
+  Execute: specs/auth-feature-r1-tasks.md
+  Review: All issues fixed, code meets all requirements
+  Output: specs/auth-feature-r2-approval.md (approved!)
+
+Result: ✅ Approved after 2 iterations
+```
+
+## Troubleshooting
+
+**Issue**: Loop exits with "Code reviewer did not generate output file"
+- **Cause**: Reviewer agent failed or generated wrong filename
+- **Fix**: Check specs folder for any generated files, verify agent is working
+
+**Issue**: Maximum iterations reached
+- **Cause**: Complex constitutional issues or spec conflicts
+- **Fix**: Review latest refinement tasks, manually address issues, consider revising spec
+
+**Issue**: Tasks file validation fails
+- **Cause**: Filename doesn't end with "-tasks.md"
+- **Fix**: Ensure file follows naming convention from constitution-task-generator
+
+## See Also
+
+- `/generate-spec` - Generate constitutional specifications
+- `/generate-tasks` - Generate task breakdowns from specs
+- Constitution Task Executor Agent
+- Constitution Code Reviewer Agent

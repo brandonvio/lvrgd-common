@@ -128,10 +128,10 @@ Execute the task autonomously:
 - Let systems fail fast - no fallback logic (Principle II)
 - Follow existing project conventions and patterns
 
-#### 4. **IMMEDIATE Checkbox Update - ALL CHECKBOXES EVERYWHERE**
+#### 4. **IMMEDIATE Checkbox Update - ALL CHECKBOXES EVERYWHERE (NON-NEGOTIABLE)**
 **THIS IS CRITICAL - UPDATE ALL CHECKBOXES IN REAL-TIME THROUGHOUT THE ENTIRE DOCUMENT**
 
-**Two types of checkboxes to update:**
+**EVERY SINGLE CHECKBOX** in the tasks.md file MUST be validated and checked off as you work. The tasks document contains checkboxes in MULTIPLE locations:
 
 **A. Quick Task Checklist (at top of file):**
 Mark the main task complete:
@@ -139,35 +139,102 @@ Mark the main task complete:
 - [x] 1. [Brief task description]
 ```
 
-**B. ALL Other Checkboxes Throughout Document:**
-As you work through each task, you will encounter verification checkboxes, quality gates, success criteria, and implementation checklists throughout the tasks.md document. **CHECK OFF EVERY CHECKBOX IN REAL-TIME** as you:
-- Verify constitutional compliance
-- Implement a feature
-- Add type hints
-- Create tests
-- Format code
-- Run validators
-- Complete any sub-step
-
-**Examples of checkboxes to check in real-time:**
+**B. Constitutional Compliance Checklists:**
+Check off as you verify each principle was followed:
 ```markdown
-### Constitutional Compliance Checklist
-- [x] All code follows radical simplicity
-- [x] Type hints used everywhere
-- [x] Structured data models (no loose dicts)
+### Constitutional Compliance
+- [x] All code follows radical simplicity (I)
+- [x] Fail fast applied throughout (II)
+- [x] Type hints on all functions (III)
+- [x] Pydantic/dataclass models used (IV)
+- [x] Unit tests use appropriate mocking (V)
+- [x] Dependency injection implemented (VI) - all REQUIRED
+- [x] SOLID principles maintained (VII)
+```
 
+**C. Code Quality Gates:**
+Check off as you complete each quality criterion:
+```markdown
 ### Code Quality Gates
 - [x] All functions have type hints
 - [x] All services use constructor injection
 - [x] No defensive programming unless requested
+- [x] Models are simple data definitions
+- [x] Tests use appropriate mocking
+- [x] Code formatted with black/ruff
+- [x] Linting passes
+```
 
-### Success Criteria
+**D. Success Criteria / Functional Requirements:**
+Check off as you implement each requirement:
+```markdown
+### Functional Requirements (from spec)
 - [x] Service loads template JSON successfully
 - [x] Service generates ISO 8601 timestamp
 - [x] Unit tests written and passing
 ```
 
-**CRITICAL RULE**: Whenever you complete ANY step, verification, validation, or implementation that corresponds to a checkbox ANYWHERE in the document, immediately check it off with `[x]`. Do NOT batch checkbox updates. Update them as you go, throughout the entire document, in real-time.
+**E. Implementation Verification / Sub-Steps:**
+Check off detailed verification steps as you complete them:
+```markdown
+### Implementation Verification
+- [x] Data model created with Pydantic
+- [x] Service uses constructor injection
+- [x] All dependencies are REQUIRED (no Optional)
+- [x] Type hints added to all functions
+```
+
+**F. Any Other Checkboxes Anywhere in the Document:**
+The tasks.md may contain additional checkboxes in ANY section. **YOU MUST CHECK THEM ALL OFF** as you complete the corresponding work.
+
+---
+
+### RIGOROUS CHECKBOX VALIDATION RULES
+
+**RULE 1: Check Off When Complete**
+Whenever you complete ANY step, verification, validation, or implementation that corresponds to a checkbox ANYWHERE in the document, immediately check it off with `[x]`.
+
+**RULE 2: Real-Time Updates (Not Batched)**
+Do NOT batch checkbox updates. Update them as you go, throughout the entire document, in real-time. After implementing a feature, IMMEDIATELY find and check all relevant checkboxes.
+
+**RULE 3: Validate You Actually Did It**
+Only check off a checkbox if you ACTUALLY completed that specific criterion. Don't check speculatively.
+
+**RULE 4: Explain If You Can't Check It**
+If you encounter a checkbox that you CANNOT check off because:
+- You took a different approach
+- The requirement doesn't apply
+- You intentionally deviated for constitutional reasons
+
+Then you MUST:
+1. **DO NOT check the box**
+2. **Add a note** next to the checkbox explaining why
+3. **Justify** your alternative approach
+
+**Example**:
+```markdown
+- [ ] ~~Fallback to database if S3 fails~~ - NOT IMPLEMENTED: Violates Principle II (Fail Fast). Instead, system fails immediately if S3 unavailable, per constitutional requirement.
+```
+
+**RULE 5: Scan Entire Document**
+Before completing your work, scan the ENTIRE tasks.md document from top to bottom to ensure you haven't missed ANY checkboxes.
+
+**RULE 6: Final Validation**
+After all implementation is complete, verify that EVERY checkbox in the document is either:
+- ✅ Checked off `[x]`, OR
+- ❌ Marked as not applicable with explanation
+
+---
+
+### WHY THIS MATTERS
+
+- **Transparency**: User sees exactly what was completed
+- **Accountability**: Every checkbox represents actual validation
+- **Quality Assurance**: Forces verification of each criterion
+- **Audit Trail**: Documents what was done and why
+- **Constitutional Compliance**: Ensures all 7 principles were followed and verified
+
+**ABSOLUTE REQUIREMENT**: You CANNOT consider your work complete until EVERY checkbox throughout the ENTIRE tasks.md document has been addressed (either checked off or explained why not).
 
 #### 5. Move to Next Task
 Immediately proceed to the next task. DO NOT STOP. DO NOT ASK FOR CONFIRMATION.
@@ -547,6 +614,12 @@ After ALL tasks are complete, append this brief summary to tasks.md:
 **Total Tasks:** [number]
 **Status:** ✅ All tasks implemented
 
+### Checkbox Validation Summary
+**Total Checkboxes in Document:** [count]
+**Checkboxes Completed:** [count checked off with [x]]
+**Checkboxes Not Applicable:** [count with explanations]
+**All Checkboxes Addressed:** ✅ YES
+
 ### Constitutional Compliance
 All seven principles followed:
 - ✅ Principle I (Radical Simplicity)
@@ -558,10 +631,15 @@ All seven principles followed:
 - ✅ Principle VII (SOLID Principles)
 
 ### Key Files Modified
-- [List main files created/modified]
+- [List main files created/modified with absolute paths]
+
+### Implementation Decisions
+- [Any important implementation decisions]
+- [Any checkboxes not completed and why]
+- [Any deviations from spec and constitutional justification]
 
 ### Notes
-- [Any important implementation decisions]
+- [Additional notes about the implementation]
 ```
 
 ## Communication Standards
@@ -594,28 +672,33 @@ Before marking any task complete:
 - [ ] No defensive programming added (Fail Fast)
 - [ ] Type hints on all functions and parameters
 - [ ] Structured data models used (no loose dicts)
-- [ ] Dependency injection implemented if service
+- [ ] Dependency injection implemented if service (all dependencies REQUIRED)
 - [ ] SOLID principles maintained
 - [ ] Code follows existing project patterns
 - [ ] Tests use appropriate mocking strategies (if applicable)
+- [ ] **ALL checkboxes in tasks.md updated** - scanned entire document
+- [ ] **Validated every checkbox was addressed** - checked off or explained
 - [ ] tasks.md updated with completion details
 - [ ] Absolute file paths with line numbers recorded
+- [ ] Checkbox validation summary included in final report
 
 ## Critical Reminders - AUTONOMOUS EXECUTION MODE
 
 1. **IMPLEMENT ALL TASKS WITHOUT STOPPING** - This is your primary mandate
-2. **UPDATE ALL CHECKBOXES IN REAL-TIME** - Check off EVERY checkbox throughout the ENTIRE document as you complete each corresponding step, not just the Quick Task Checklist
-3. **NO CONFIRMATION NEEDED** - Work autonomously through entire list
-4. **Read constitution BEFORE starting** - Understand all seven principles
-5. **Keep it simple** (Principle I) - Always choose simplest approach
-6. **Use type hints everywhere** (Principle III) - Including tests
-7. **Inject dependencies** (Principle VI) - Constructor injection pattern
-8. **Follow SOLID** (Principle VII) - All five principles
-9. **Let it fail fast** (Principle II) - No defensive programming
-10. **Use structured models** (Principle IV) - Pydantic/dataclass, not dicts
-11. **Use appropriate mocking in tests** (Principle V) - For all external services
-12. **CHECK OFF CHECKBOXES EVERYWHERE** - Quality gates, success criteria, compliance checklists - mark them all as you go
-13. **JUST KEEP MOVING FORWARD** - Complete the entire task list
+2. **UPDATE EVERY SINGLE CHECKBOX IN REAL-TIME** - Check off ALL checkboxes throughout the ENTIRE document (task checklist, constitutional compliance, quality gates, success criteria, verification steps, etc.) as you complete each corresponding step. If you can't check a box, explain why.
+3. **VALIDATE BEFORE CHECKING** - Only check off checkboxes you ACTUALLY completed. Don't check speculatively.
+4. **SCAN ENTIRE DOCUMENT** - Before finishing, scan top-to-bottom to ensure NO checkbox was missed
+5. **NO CONFIRMATION NEEDED** - Work autonomously through entire list
+6. **Read constitution BEFORE starting** - Understand all seven principles
+7. **Keep it simple** (Principle I) - Always choose simplest approach
+8. **Use type hints everywhere** (Principle III) - Including tests
+9. **Inject dependencies** (Principle VI) - Constructor injection pattern (all REQUIRED, no Optional, no defaults)
+10. **Follow SOLID** (Principle VII) - All five principles
+11. **Let it fail fast** (Principle II) - No defensive programming
+12. **Use structured models** (Principle IV) - Pydantic/dataclass, not dicts
+13. **Use appropriate mocking in tests** (Principle V) - For all external services
+14. **WORK NOT COMPLETE UNTIL ALL CHECKBOXES ADDRESSED** - Every checkbox must be checked or explained
+15. **JUST KEEP MOVING FORWARD** - Complete the entire task list
 
 ## Execution Pattern
 
