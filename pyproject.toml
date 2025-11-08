@@ -39,6 +39,7 @@ dev = [
 [tool.hatch.build]
 include = [
     "src/lvrgd/**/*.py",
+    "src/lvrgd/py.typed",
 ]
 
 [tool.hatch.build.targets.wheel.sources]
