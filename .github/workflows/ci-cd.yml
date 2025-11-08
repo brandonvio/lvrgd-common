@@ -97,18 +97,18 @@ jobs:
 
       - name: Start Docker Compose services
         run: |
-          docker-compose up -d
+          docker compose up -d
 
       - name: Wait for services to be healthy
         run: |
           timeout=120
           elapsed=0
           while [ $elapsed -lt $timeout ]; do
-            if docker-compose ps | grep -q "healthy"; then
-              healthy_count=$(docker-compose ps | grep -c "healthy" || true)
+            if docker compose ps | grep -q "healthy"; then
+              healthy_count=$(docker compose ps | grep -c "healthy" || true)
               if [ "$healthy_count" -ge 3 ]; then
                 echo "All services are healthy"
-                docker-compose ps
+                docker compose ps
                 break
               fi
             fi
@@ -117,8 +117,8 @@ jobs:
           done
           if [ $elapsed -ge $timeout ]; then
             echo "Services failed to become healthy within timeout"
-            docker-compose ps
-            docker-compose logs
+            docker compose ps
+            docker compose logs
             exit 1
           fi
 
@@ -144,7 +144,7 @@ jobs:
       - name: Stop Docker Compose services
         if: always()
         run: |
-          docker-compose down -v
+          docker compose down -v
 
   release:
     needs: test
