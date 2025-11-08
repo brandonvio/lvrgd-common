@@ -37,10 +37,21 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-exclude = ["src"]
+only-include = []
 
 [tool.hatch.build.targets.wheel.force-include]
 "src/services" = "services"
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+    ".git",
+    ".github",
+    ".venv",
+    ".pytest_cache",
+    ".ruff_cache",
+    "dist",
+    "*.egg-info",
+]
 
 [tool.uv]
 package = true
