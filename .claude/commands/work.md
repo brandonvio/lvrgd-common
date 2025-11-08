@@ -164,20 +164,35 @@ FOR EACH TASK:
   Execute task following constitutional principles:
 
   - Read relevant files if needed
-  - Apply Radical Simplicity - choose simplest approach
+  - Apply Radical Simplicity - choose simplest approach (functions must be <10 complexity, <50 statements)
   - Use Type Hints everywhere
   - Use Pydantic/dataclasses for data structures
   - Implement Dependency Injection (all deps REQUIRED)
   - Follow SOLID principles
-  - Apply Fail Fast - no defensive programming
+  - Apply Fail Fast - no defensive programming, no blind exception catching
   - Add unit tests with appropriate mocking
   - Write to files as needed
-  - Run formatting/linting if applicable
+
+  # LINTING QUALITY GATE (MANDATORY)
+  BEFORE marking complete - Linting Quality Gate:
+  1. Run: ruff format {modified_files}
+  2. Run: ruff check --fix {modified_files}
+  3. Run: ruff check {modified_files}
+  4. If violations exist: STOP and manually resolve:
+     - C901/PLR0915 (complexity >10 or >50 statements) → refactor into smaller functions (VIOLATES Principle I)
+     - BLE001 (blind exception) → use specific exception types (VIOLATES Principle II)
+     - PERF203 (try-except in loop) → optimize or accept with justification
+     - A002 (builtin shadow) → rename variables
+     - FBT* (boolean args) → use named parameters or enums
+     - SIM* (simplification) → apply suggested pattern
+  5. Re-run: ruff check {modified_files}
+  6. Only proceed when ruff check reports ZERO violations
 
   Display: "Implementation complete for: {TASK_DESCRIPTION}"
+  Display: "Linting: CLEAN (zero violations)"
   Display: ""
 
-  # Mark task as completed
+  # Mark task as completed (only after linting is clean)
   Update TodoWrite: status = "completed"
 
   Display: "Status: ✅ COMPLETED"
@@ -245,13 +260,14 @@ If error occurs during task execution:
 
 Every task implementation must verify:
 
-- [ ] **Radical Simplicity** - Implemented the simplest possible solution
-- [ ] **Fail Fast** - No defensive programming or unnecessary fallbacks
+- [ ] **Radical Simplicity** - Implemented the simplest possible solution (functions <10 complexity, <50 statements)
+- [ ] **Fail Fast** - No defensive programming or unnecessary fallbacks, no blind exception catching
 - [ ] **Type Safety** - Type hints on ALL functions and parameters
 - [ ] **Structured Data** - Used Pydantic/dataclasses, not dicts
 - [ ] **Unit Testing** - Added tests with appropriate mocking
 - [ ] **Dependency Injection** - All deps REQUIRED, none created in constructors
 - [ ] **SOLID Principles** - SRP, OCP, LSP, ISP, DIP all followed
+- [ ] **Linting Clean** - Zero violations from `ruff check` (MANDATORY)
 
 ## Notes
 
@@ -283,10 +299,15 @@ The command provides real-time status updates:
 
 All code must pass:
 - Type hint completeness check
-- Simplicity review (no unnecessary complexity)
+- Simplicity review (no unnecessary complexity, functions <10 complexity, <50 statements)
 - Dependency injection validation (no Optional, no defaults)
 - SOLID principles compliance
-- Fail-fast philosophy adherence
+- Fail-fast philosophy adherence (no blind exception catching)
+- **Linting quality gate (MANDATORY):**
+  - `ruff format` applied
+  - `ruff check --fix` applied
+  - `ruff check` returns ZERO violations
+  - All complexity, exception, and style violations resolved
 
 ## Example Execution
 

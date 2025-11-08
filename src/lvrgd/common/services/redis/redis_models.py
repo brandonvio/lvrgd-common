@@ -71,6 +71,10 @@ class RedisConfig(BaseModel):
         ge=0,
         le=300,
     )
+    namespace: str | None = Field(
+        None,
+        description="Optional namespace prefix for all keys",
+    )
 
     @field_validator("host")
     @classmethod

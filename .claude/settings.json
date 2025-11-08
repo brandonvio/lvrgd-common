@@ -1,7 +1,7 @@
 {
   "permissions": {
     "allow": [
-      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:*)",
       "Bash(tree:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
@@ -13,7 +13,9 @@
       "Bash(git pull:*)",
       "Bash(python3 -m pytest:*)",
       "Bash(uv run pytest:*)",
-      "Bash(gh:*)"
+      "Bash(gh:*)",
+      "Bash(uv:*)",
+      "Bash(test:*)"
     ],
     "deny": [],
     "ask": []

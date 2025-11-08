@@ -14,6 +14,12 @@ help:
 	@echo "  check        - Run all checks (lint, format, test)"
 	@echo "  clean        - Clean up temporary files"
 
+validate:
+	@echo "Validating code..."
+	ruff check . --fix
+	ruff format .
+	uv run python -m pytest tests/ -x --tb=short
+
 # Install dependencies
 install:
 	@echo "Installing dependencies with uv..."
@@ -23,6 +29,10 @@ install:
 test:
 	@echo "Running unit tests..."
 	uv run python -m pytest tests/ -x
+
+test-short:
+	@echo "Running short unit tests..."
+	uv run python -m pytest tests/ -v --tb=short
 
 # Run tests with verbose output
 test-verbose:

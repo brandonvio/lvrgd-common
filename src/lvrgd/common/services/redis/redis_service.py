@@ -10,11 +10,15 @@ This module provides a clean Redis service implementation with:
 
 from __future__ import annotations
 
+import functools
+import json
 import struct
-from collections.abc import Iterator
+import time
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from typing import Any
+from typing import Any, TypeVar
 
+from pydantic import BaseModel, ValidationError
 from redis import ConnectionPool, Redis
 from redis.commands.search.field import NumericField, TagField, TextField, VectorField
 from redis.commands.search.index_definition import IndexDefinition, IndexType
@@ -25,6 +29,8 @@ from redis.exceptions import ResponseError
 from lvrgd.common.services.logging_service import LoggingService
 
 from .redis_models import RedisConfig
+
+T = TypeVar("T", bound=BaseModel)
 
 
 class RedisService:
@@ -82,6 +88,19 @@ class RedisService:
             self.log.exception("Failed to initialize Redis connection")
             raise
 
+    def _apply_namespace(self, key: str) -> str:
+        """Apply namespace prefix to key if configured.
+
+        Args:
+            key: Original key
+
+        Returns:
+            Key with namespace prefix if configured, otherwise original key
+        """
+        if self.config.namespace:
+            return f"{self.config.namespace}:{key}"
+        return key
+
     def ping(self) -> bool:
         """Ping the Redis server to verify connection.
 
@@ -103,17 +122,18 @@ class RedisService:
         """Get value for a key.
 
         Args:
-            key: Key to retrieve
+            key: Key to retrieve (namespace will be applied if configured)
 
         Returns:
             Value associated with key, or None if key doesn't exist
         """
-        self.log.debug("Getting value", key=key)
-        value = self._client.get(key)
+        namespaced_key = self._apply_namespace(key)
+        self.log.debug("Getting value", key=namespaced_key)
+        value = self._client.get(namespaced_key)
         if value:
-            self.log.debug("Found value", key=key)
+            self.log.debug("Found value", key=namespaced_key)
         else:
-            self.log.debug("Key not found", key=key)
+            self.log.debug("Key not found", key=namespaced_key)
         return value
 
     def set(
@@ -128,7 +148,7 @@ class RedisService:
         """Set key to hold the string value.
 
         Args:
-            key: Key to set
+            key: Key to set (namespace will be applied if configured)
             value: Value to set
             ex: Expire time in seconds
             px: Expire time in milliseconds
@@ -138,29 +158,31 @@ class RedisService:
         Returns:
             True if operation was successful
         """
+        namespaced_key = self._apply_namespace(key)
         self.log.debug(
             "Setting value",
-            key=key,
+            key=namespaced_key,
             ex=ex,
             px=px,
             nx=nx,
             xx=xx,
         )
-        result = self._client.set(key, value, ex=ex, px=px, nx=nx, xx=xx)
-        self.log.info("Successfully set value", key=key)
+        result = self._client.set(namespaced_key, value, ex=ex, px=px, nx=nx, xx=xx)
+        self.log.info("Successfully set value", key=namespaced_key)
         return bool(result)
 
     def delete(self, *keys: str) -> int:
         """Delete one or more keys.
 
         Args:
-            *keys: Keys to delete
+            *keys: Keys to delete (namespace will be applied if configured)
 
         Returns:
             Number of keys that were deleted
         """
-        self.log.debug("Deleting keys", count=len(keys))
-        result = self._client.delete(*keys)
+        namespaced_keys = [self._apply_namespace(k) for k in keys]
+        self.log.debug("Deleting keys", count=len(namespaced_keys))
+        result = self._client.delete(*namespaced_keys)
         self.log.info("Successfully deleted keys", deleted=result)
         return result
 
@@ -168,13 +190,14 @@ class RedisService:
         """Check if one or more keys exist.
 
         Args:
-            *keys: Keys to check
+            *keys: Keys to check (namespace will be applied if configured)
 
         Returns:
             Number of keys that exist
         """
-        self.log.debug("Checking key existence", count=len(keys))
-        result = self._client.exists(*keys)
+        namespaced_keys = [self._apply_namespace(k) for k in keys]
+        self.log.debug("Checking key existence", count=len(namespaced_keys))
+        result = self._client.exists(*namespaced_keys)
         self.log.debug("Keys existence check", exists=result)
         return result
 
@@ -182,59 +205,63 @@ class RedisService:
         """Set a timeout on key.
 
         Args:
-            key: Key to set timeout on
+            key: Key to set timeout on (namespace will be applied if configured)
             seconds: Timeout in seconds
 
         Returns:
             True if timeout was set, False if key doesn't exist
         """
-        self.log.debug("Setting expiration", key=key, seconds=seconds)
-        result = self._client.expire(key, seconds)
-        self.log.info("Successfully set expiration", key=key, result=result)
+        namespaced_key = self._apply_namespace(key)
+        self.log.debug("Setting expiration", key=namespaced_key, seconds=seconds)
+        result = self._client.expire(namespaced_key, seconds)
+        self.log.info("Successfully set expiration", key=namespaced_key, result=result)
         return bool(result)
 
     def ttl(self, key: str) -> int:
         """Get the time to live for a key.
 
         Args:
-            key: Key to check
+            key: Key to check (namespace will be applied if configured)
 
         Returns:
             TTL in seconds, -1 if key exists but has no expire, -2 if key doesn't exist
         """
-        self.log.debug("Getting TTL", key=key)
-        result = self._client.ttl(key)
-        self.log.debug("TTL retrieved", key=key, ttl=result)
+        namespaced_key = self._apply_namespace(key)
+        self.log.debug("Getting TTL", key=namespaced_key)
+        result = self._client.ttl(namespaced_key)
+        self.log.debug("TTL retrieved", key=namespaced_key, ttl=result)
         return result
 
     def incr(self, key: str, amount: int = 1) -> int:
         """Increment the integer value of a key.
 
         Args:
-            key: Key to increment
+            key: Key to increment (namespace will be applied if configured)
             amount: Amount to increment by (default: 1)
 
         Returns:
             Value of key after increment
         """
-        self.log.debug("Incrementing key", key=key, amount=amount)
-        result = self._client.incr(key, amount)
-        self.log.info("Successfully incremented key", key=key, new_value=result)
+        namespaced_key = self._apply_namespace(key)
+        self.log.debug("Incrementing key", key=namespaced_key, amount=amount)
+        result = self._client.incr(namespaced_key, amount)
+        self.log.info("Successfully incremented key", key=namespaced_key, new_value=result)
         return result
 
     def decr(self, key: str, amount: int = 1) -> int:
         """Decrement the integer value of a key.
 
         Args:
-            key: Key to decrement
+            key: Key to decrement (namespace will be applied if configured)
             amount: Amount to decrement by (default: 1)
 
         Returns:
             Value of key after decrement
         """
-        self.log.debug("Decrementing key", key=key, amount=amount)
-        result = self._client.decr(key, amount)
-        self.log.info("Successfully decremented key", key=key, new_value=result)
+        namespaced_key = self._apply_namespace(key)
+        self.log.debug("Decrementing key", key=namespaced_key, amount=amount)
+        result = self._client.decr(namespaced_key, amount)
+        self.log.info("Successfully decremented key", key=namespaced_key, new_value=result)
         return result
 
     def hget(self, name: str, key: str) -> str | None:
@@ -710,6 +737,833 @@ class RedisService:
         except ResponseError:
             self.log.exception("Failed to drop index", index_name=index_name)
             raise
+
+    def get_json(self, key: str) -> dict[str, Any] | list[Any] | None:
+        """Get and deserialize JSON value for a key.
+
+        Args:
+            key: Key to retrieve (namespace will be applied if configured)
+
+        Returns:
+            Deserialized JSON value (dict, list, or primitive), or None if key doesn't exist
+
+        Raises:
+            json.JSONDecodeError: If stored value is not valid JSON
+
+        Example:
+            data = redis_service.get_json("user:123")
+            # Returns: {"name": "John", "age": 30}
+        """
+        namespaced_key = self._apply_namespace(key)
+        self.log.debug("Getting JSON value", key=namespaced_key)
+        value = self._client.get(namespaced_key)
+
+        if value is None:
+            self.log.debug("Key not found", key=namespaced_key)
+            return None
+
+        try:
+            result = json.loads(value)
+            self.log.debug("Successfully deserialized JSON", key=namespaced_key)
+            return result
+        except json.JSONDecodeError:
+            self.log.warning("Invalid JSON for key", key=namespaced_key)
+            raise
+
+    def set_json(
+        self,
+        key: str,
+        value: dict[str, Any] | list[Any] | str | float | bool | None,
+        ex: int | None = None,
+        nx: bool = False,
+        xx: bool = False,
+    ) -> bool:
+        """Serialize and set JSON value for a key.
+
+        Args:
+            key: Key to set (namespace will be applied if configured)
+            value: JSON-serializable value (dict, list, or primitive)
+            ex: Expire time in seconds
+            nx: Only set if key doesn't exist
+            xx: Only set if key already exists
+
+        Returns:
+            True if operation was successful
+
+        Example:
+            redis_service.set_json("user:123", {"name": "John", "age": 30}, ex=3600)
+        """
+        namespaced_key = self._apply_namespace(key)
+        self.log.debug("Setting JSON value", key=namespaced_key, ex=ex, nx=nx, xx=xx)
+        json_str = json.dumps(value)
+        result = self._client.set(namespaced_key, json_str, ex=ex, nx=nx, xx=xx)
+        self.log.info("Successfully set JSON value", key=namespaced_key)
+        return bool(result)
+
+    def mget_json(self, *keys: str) -> dict[str, Any]:
+        """Get multiple JSON values in a single operation.
+
+        Args:
+            *keys: Keys to retrieve (namespace will be applied if configured)
+
+        Returns:
+            Dictionary mapping original keys to their deserialized JSON values (omits missing keys and invalid JSON)
+
+        Example:
+            results = redis_service.mget_json("user:1", "user:2", "user:3")
+            # Returns: {"user:1": {"name": "John"}, "user:2": {"name": "Jane"}}
+        """
+        namespaced_keys = [self._apply_namespace(k) for k in keys]
+        self.log.debug("Getting multiple JSON values", count=len(namespaced_keys))
+        values = self._client.mget(*namespaced_keys)
+        result: dict[str, Any] = {}
+
+        for key, value in zip(keys, values, strict=False):
+            if value is None:
+                continue
+
+            try:
+                result[key] = json.loads(value)
+            except json.JSONDecodeError:
+                self.log.warning("Invalid JSON for key, skipping", key=key)
+                continue
+
+        self.log.info("Retrieved JSON values", requested=len(keys), returned=len(result))
+        return result
+
+    def mset_json(
+        self,
+        mapping: dict[str, dict[str, Any] | list[Any] | str | int | float | bool | None],
+        ex: int | None = None,
+    ) -> bool:
+        """Set multiple JSON values in a single operation.
+
+        Args:
+            mapping: Dictionary of key-value pairs to set (namespace will be applied if configured)
+            ex: Optional expiration time in seconds (applied to all keys)
+
+        Returns:
+            True if operation was successful
+
+        Example:
+            redis_service.mset_json({
+                "user:1": {"name": "John"},
+                "user:2": {"name": "Jane"}
+            }, ex=3600)
+        """
+        self.log.debug("Setting multiple JSON values", count=len(mapping), ex=ex)
+
+        # Apply namespace and serialize all values to JSON
+        json_mapping = {
+            self._apply_namespace(key): json.dumps(value) for key, value in mapping.items()
+        }
+
+        if ex is None:
+            # Simple MSET without expiration
+            result = self._client.mset(json_mapping)
+            self.log.info("Successfully set JSON values", count=len(mapping))
+            return bool(result)
+
+        # Use pipeline for MSET + EXPIRE
+        with self.pipeline() as pipe:
+            pipe.mset(json_mapping)
+            for key in json_mapping:
+                pipe.expire(key, ex)
+            pipe.execute()
+
+        self.log.info("Successfully set JSON values with expiration", count=len(mapping), ex=ex)
+        return True
+
+    def hget_json(self, name: str, key: str) -> dict[str, Any] | list[Any] | None:
+        """Get and deserialize JSON value from hash field.
+
+        Args:
+            name: Hash name
+            key: Field key
+
+        Returns:
+            Deserialized JSON value, or None if field doesn't exist
+
+        Raises:
+            json.JSONDecodeError: If stored value is not valid JSON
+
+        Example:
+            data = redis_service.hget_json("users", "user:123")
+            # Returns: {"name": "John", "age": 30}
+        """
+        self.log.debug("Getting JSON hash field", hash=name, key=key)
+        value = self._client.hget(name, key)
+
+        if value is None:
+            self.log.debug("Hash field not found", hash=name, key=key)
+            return None
+
+        try:
+            result = json.loads(value)
+            self.log.debug("Successfully deserialized JSON hash field", hash=name, key=key)
+            return result
+        except json.JSONDecodeError:
+            self.log.warning("Invalid JSON in hash field", hash=name, key=key)
+            raise
+
+    def hset_json(
+        self,
+        name: str,
+        key: str,
+        value: dict[str, Any] | list[Any] | str | float | bool | None,
+    ) -> int:
+        """Serialize and set JSON value in hash field.
+
+        Args:
+            name: Hash name
+            key: Field key
+            value: JSON-serializable value
+
+        Returns:
+            Number of fields that were added (0 if field existed and was updated)
+
+        Example:
+            redis_service.hset_json("users", "user:123", {"name": "John", "age": 30})
+        """
+        self.log.debug("Setting JSON hash field", hash=name, key=key)
+        json_str = json.dumps(value)
+        result = self._client.hset(name, key, json_str)
+        self.log.info("Successfully set JSON hash field", hash=name, key=key, added=result)
+        return result
+
+    def hgetall_json(self, name: str) -> dict[str, Any]:
+        """Get all fields and deserialize JSON values from hash.
+
+        Args:
+            name: Hash name
+
+        Returns:
+            Dictionary of field-value pairs with deserialized JSON values (skips invalid JSON)
+
+        Example:
+            data = redis_service.hgetall_json("users")
+            # Returns: {"user:1": {"name": "John"}, "user:2": {"name": "Jane"}}
+        """
+        self.log.debug("Getting all JSON hash fields", hash=name)
+        raw_data = self._client.hgetall(name)
+        result: dict[str, Any] = {}
+
+        for key, value in raw_data.items():
+            try:
+                result[key] = json.loads(value)
+            except json.JSONDecodeError:  # noqa: PERF203
+                # Try-except in loop is intentional - each field may have invalid JSON
+                self.log.warning("Invalid JSON in hash field, skipping", hash=name, key=key)
+                continue
+
+        self.log.info("Retrieved JSON hash fields", hash=name, count=len(result))
+        return result
+
+    def get_model(self, key: str, model_class: type[T]) -> T | None:
+        """Get and deserialize Pydantic model for a key.
+
+        Args:
+            key: Key to retrieve
+            model_class: Pydantic model class to deserialize into
+
+        Returns:
+            Validated Pydantic model instance, or None if key doesn't exist
+
+        Raises:
+            ValidationError: If stored data doesn't match model schema
+
+        Example:
+            user = redis_service.get_model("user:123", UserModel)
+            # Returns: UserModel(name="John", age=30)
+        """
+        self.log.debug("Getting Pydantic model", key=key, model=model_class.__name__)
+        namespaced_key = self._apply_namespace(key)
+        value = self._client.get(namespaced_key)
+
+        if value is None:
+            self.log.debug("Key not found", key=key)
+            return None
+
+        try:
+            data = json.loads(value)
+            result = model_class(**data)
+            self.log.debug("Successfully validated model", key=key, model=model_class.__name__)
+            return result
+        except ValidationError:
+            self.log.warning("Validation failed for model", key=key, model=model_class.__name__)
+            raise
+
+    def set_model(
+        self,
+        key: str,
+        model: BaseModel,
+        ex: int | None = None,
+        nx: bool = False,
+        xx: bool = False,
+    ) -> bool:
+        """Serialize and set Pydantic model for a key.
+
+        Args:
+            key: Key to set
+            model: Pydantic model instance to store
+            ex: Expire time in seconds
+            nx: Only set if key doesn't exist
+            xx: Only set if key already exists
+
+        Returns:
+            True if operation was successful
+
+        Example:
+            user = UserModel(name="John", age=30)
+            redis_service.set_model("user:123", user, ex=3600)
+        """
+        self.log.debug(
+            "Setting Pydantic model", key=key, model=type(model).__name__, ex=ex, nx=nx, xx=xx
+        )
+        json_str = model.model_dump_json()
+        namespaced_key = self._apply_namespace(key)
+        result = self._client.set(namespaced_key, json_str, ex=ex, nx=nx, xx=xx)
+        self.log.info("Successfully set model", key=key, model=type(model).__name__)
+        return bool(result)
+
+    def mget_models(self, model_class: type[T], *keys: str) -> dict[str, T]:
+        """Get multiple Pydantic models in a single operation.
+
+        Args:
+            model_class: Pydantic model class to deserialize into
+            *keys: Keys to retrieve
+
+        Returns:
+            Dictionary mapping keys to validated model instances (omits missing keys and invalid models)
+
+        Example:
+            users = redis_service.mget_models(UserModel, "user:1", "user:2", "user:3")
+            # Returns: {"user:1": UserModel(...), "user:2": UserModel(...)}
+        """
+        self.log.debug(
+            "Getting multiple Pydantic models", model=model_class.__name__, count=len(keys)
+        )
+        namespaced_keys = [self._apply_namespace(k) for k in keys]
+        values = self._client.mget(*namespaced_keys)
+        result: dict[str, T] = {}
+
+        for key, value in zip(keys, values, strict=False):
+            if value is None:
+                continue
+
+            try:
+                data = json.loads(value)
+                result[key] = model_class(**data)
+            except (json.JSONDecodeError, ValidationError):
+                self.log.warning(
+                    "Invalid model data for key, skipping", key=key, model=model_class.__name__
+                )
+                continue
+
+        self.log.info(
+            "Retrieved models",
+            model=model_class.__name__,
+            requested=len(keys),
+            returned=len(result),
+        )
+        return result
+
+    def mset_models(self, mapping: dict[str, BaseModel], ex: int | None = None) -> bool:
+        """Set multiple Pydantic models in a single operation.
+
+        Args:
+            mapping: Dictionary of key-model pairs to set
+            ex: Optional expiration time in seconds (applied to all keys)
+
+        Returns:
+            True if operation was successful
+
+        Example:
+            redis_service.mset_models({
+                "user:1": UserModel(name="John"),
+                "user:2": UserModel(name="Jane")
+            }, ex=3600)
+        """
+        self.log.debug("Setting multiple Pydantic models", count=len(mapping), ex=ex)
+
+        # Serialize all models to JSON and apply namespace
+        json_mapping = {
+            self._apply_namespace(key): model.model_dump_json() for key, model in mapping.items()
+        }
+
+        if ex is None:
+            # Simple MSET without expiration
+            result = self._client.mset(json_mapping)
+            self.log.info("Successfully set models", count=len(mapping))
+            return bool(result)
+
+        # Use pipeline for MSET + EXPIRE
+        with self.pipeline() as pipe:
+            pipe.mset(json_mapping)
+            for key in mapping:
+                pipe.expire(self._apply_namespace(key), ex)
+            pipe.execute()
+
+        self.log.info("Successfully set models with expiration", count=len(mapping), ex=ex)
+        return True
+
+    def hget_model(self, hash_name: str, field: str, model_class: type[T]) -> T | None:
+        """Get and deserialize Pydantic model from hash field.
+
+        Args:
+            hash_name: Hash name
+            field: Field key
+            model_class: Pydantic model class to deserialize into
+
+        Returns:
+            Validated Pydantic model instance, or None if field doesn't exist
+
+        Raises:
+            ValidationError: If stored data doesn't match model schema
+
+        Example:
+            user = redis_service.hget_model("users", "user:123", UserModel)
+            # Returns: UserModel(name="John", age=30)
+        """
+        self.log.debug(
+            "Getting Pydantic model from hash",
+            hash=hash_name,
+            field=field,
+            model=model_class.__name__,
+        )
+        value = self._client.hget(hash_name, field)
+
+        if value is None:
+            self.log.debug("Hash field not found", hash=hash_name, field=field)
+            return None
+
+        try:
+            data = json.loads(value)
+            result = model_class(**data)
+            self.log.debug(
+                "Successfully validated model from hash",
+                hash=hash_name,
+                field=field,
+                model=model_class.__name__,
+            )
+            return result
+        except ValidationError:
+            self.log.warning(
+                "Validation failed for hash field",
+                hash=hash_name,
+                field=field,
+                model=model_class.__name__,
+            )
+            raise
+
+    def hset_model(self, hash_name: str, field: str, model: BaseModel) -> int:
+        """Serialize and set Pydantic model in hash field.
+
+        Args:
+            hash_name: Hash name
+            field: Field key
+            model: Pydantic model instance to store
+
+        Returns:
+            Number of fields that were added (0 if field existed and was updated)
+
+        Example:
+            user = UserModel(name="John", age=30)
+            redis_service.hset_model("users", "user:123", user)
+        """
+        self.log.debug(
+            "Setting Pydantic model in hash",
+            hash=hash_name,
+            field=field,
+            model=type(model).__name__,
+        )
+        json_str = model.model_dump_json()
+        result = self._client.hset(hash_name, field, json_str)
+        self.log.info(
+            "Successfully set model in hash",
+            hash=hash_name,
+            field=field,
+            model=type(model).__name__,
+            added=result,
+        )
+        return result
+
+    def cache(  # noqa: C901, PLR0915
+        self,
+        ttl: int,
+        key_prefix: str | None = None,
+        namespace: str | None = None,
+        skip_cache_if: Callable[[Any], bool] | None = None,
+        prevent_thundering_herd: bool = False,
+    ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+        """Decorator to cache function results in Redis.
+
+        Args:
+            ttl: Time to live in seconds
+            key_prefix: Optional prefix for cache key
+            namespace: Optional namespace for cache key
+            skip_cache_if: Optional callable to skip caching based on result
+            prevent_thundering_herd: Use lock to prevent multiple simultaneous cache fills
+
+        Returns:
+            Decorator function
+
+        Example:
+            @redis_service.cache(ttl=3600, key_prefix="user", namespace="app")
+            def get_user(user_id: str) -> dict[str, Any]:
+                return fetch_user_from_db(user_id)
+        """
+
+        def decorator(func: Callable[..., Any]) -> Callable[..., Any]:  # noqa: C901
+            @functools.wraps(func)
+            def wrapper(*args: Any, **kwargs: Any) -> Any:
+                # Generate cache key
+                cache_key = self._generate_cache_key(func, key_prefix, namespace, args, kwargs)
+
+                # Try to get cached value
+                try:
+                    cached = self.get_json(cache_key)
+                    if cached is not None:
+                        self.log.debug("Cache hit", cache_key=cache_key)
+                        return cached
+                except Exception:  # noqa: BLE001
+                    # Broad exception catch is intentional - cache failures should not break function
+                    self.log.warning(
+                        "Failed to get cached value, calling function", cache_key=cache_key
+                    )
+
+                # Cache miss - need to call function
+                if prevent_thundering_herd:
+                    lock_key = f"{cache_key}:lock"
+                    lock_acquired = self.set(lock_key, "1", ex=ttl, nx=True)
+
+                    if not lock_acquired:
+                        # Another process is computing, wait briefly and retry cache
+                        self.log.debug(
+                            "Lock held by another process, retrying cache", cache_key=cache_key
+                        )
+                        try:
+                            cached = self.get_json(cache_key)
+                            if cached is not None:
+                                return cached
+                        except Exception:  # noqa: BLE001
+                            # Broad exception catch is intentional - if cache read fails during lock wait,
+                            # we'll compute the value ourselves
+                            self.log.debug(
+                                "Failed to retry cache read, will compute value",
+                                cache_key=cache_key,
+                            )
+
+                # Call the actual function
+                try:
+                    result = func(*args, **kwargs)
+
+                    # Check if we should skip caching this result
+                    if skip_cache_if and skip_cache_if(result):
+                        self.log.debug(
+                            "Skipping cache due to skip_cache_if condition", cache_key=cache_key
+                        )
+                        return result
+
+                    # Store result in cache
+                    try:
+                        self.set_json(cache_key, result, ex=ttl)
+                        self.log.debug("Cached function result", cache_key=cache_key, ttl=ttl)
+                    except Exception:  # noqa: BLE001
+                        # Broad exception catch is intentional - cache write failures should not break function
+                        self.log.warning("Failed to cache result", cache_key=cache_key)
+
+                    return result
+
+                except Exception:
+                    self.log.exception("Function call failed", cache_key=cache_key)
+                    raise
+
+            def invalidate(*args: Any, **kwargs: Any) -> int:
+                """Invalidate cached result for specific arguments.
+
+                Args:
+                    *args: Positional arguments for cache key generation
+                    **kwargs: Keyword arguments for cache key generation
+
+                Returns:
+                    Number of keys deleted (0 or 1)
+                """
+                cache_key = self._generate_cache_key(func, key_prefix, namespace, args, kwargs)
+                deleted = self.delete(cache_key)
+                self.log.info("Invalidated cache", cache_key=cache_key, deleted=deleted)
+                return deleted
+
+            def invalidate_all() -> int:
+                """Invalidate all cached results for this function.
+
+                Returns:
+                    Number of keys deleted
+                """
+                pattern_parts = []
+                if namespace:
+                    pattern_parts.append(namespace)
+                if key_prefix:
+                    pattern_parts.append(key_prefix)
+                pattern_parts.append(func.__name__)
+                pattern = ":".join(pattern_parts) + "*"
+
+                keys = list(self._client.scan_iter(match=pattern))
+                if keys:
+                    deleted = self.delete(*keys)
+                    self.log.info("Invalidated all cache entries", pattern=pattern, deleted=deleted)
+                    return deleted
+                return 0
+
+            # Attach invalidation methods to wrapper
+            wrapper.invalidate = invalidate  # type: ignore[attr-defined]
+            wrapper.invalidate_all = invalidate_all  # type: ignore[attr-defined]
+
+            return wrapper
+
+        return decorator
+
+    def _generate_cache_key(
+        self,
+        func: Callable[..., Any],
+        key_prefix: str | None,
+        namespace: str | None,
+        args: tuple[Any, ...],
+        kwargs: dict[str, Any],
+    ) -> str:
+        """Generate cache key from function and arguments.
+
+        Args:
+            func: Function being cached
+            key_prefix: Prefix for cache key
+            namespace: Namespace for cache key
+            args: Positional arguments
+            kwargs: Keyword arguments
+
+        Returns:
+            Generated cache key
+        """
+        parts = []
+
+        # Add namespace
+        if namespace is not None:
+            parts.append(namespace)
+
+        # Add key prefix
+        if key_prefix is not None:
+            parts.append(key_prefix)
+
+        # Add function name
+        parts.append(func.__name__)
+
+        # Add arguments
+        parts.extend(self._serialize_cache_arg(arg) for arg in args)
+
+        # Add keyword arguments (sorted for consistency)
+        for key, value in sorted(kwargs.items()):
+            parts.append(f"{key}={self._serialize_cache_arg(value)}")
+
+        return ":".join(parts)
+
+    def _serialize_cache_arg(self, arg: Any) -> str:
+        """Serialize argument for cache key.
+
+        Args:
+            arg: Argument to serialize
+
+        Returns:
+            Serialized string representation
+        """
+        if isinstance(arg, str):
+            return arg
+        if isinstance(arg, (int, float)):
+            return str(arg)
+        if isinstance(arg, (list, dict)):
+            return json.dumps(arg, sort_keys=True)
+        return str(arg)
+
+    def get_or_compute(
+        self,
+        key: str,
+        compute: Callable[[], Any],
+        ex: int | None = None,
+        serialize_json: bool = True,
+    ) -> Any:
+        """Get value from cache or compute and store it atomically.
+
+        Args:
+            key: Cache key
+            compute: Callable to compute value if not cached
+            ex: Optional expiration time in seconds
+            serialize_json: Whether to serialize/deserialize as JSON
+
+        Returns:
+            Cached or computed value
+
+        Example:
+            result = redis_service.get_or_compute(
+                "user:123",
+                lambda: fetch_user_from_db("123"),
+                ex=3600
+            )
+        """
+        self.log.debug("Get or compute", key=key, serialize_json=serialize_json)
+
+        # Try to get cached value
+        cached = self.get_json(key) if serialize_json else self.get(key)
+
+        if cached is not None:
+            self.log.debug("Cache hit in get_or_compute", key=key)
+            return cached
+
+        # Use SET NX to acquire lock and prevent race condition
+        lock_key = f"{key}:lock"
+        lock_acquired = self.set(lock_key, "1", ex=ex or 60, nx=True)
+
+        if not lock_acquired:
+            # Another process is computing, wait and retry
+            self.log.debug("Lock held by another process in get_or_compute", key=key)
+            cached = self.get_json(key) if serialize_json else self.get(key)
+            if cached is not None:
+                return cached
+
+        # Compute the value
+        self.log.debug("Computing value", key=key)
+        result = compute()
+
+        # Store the computed value
+        if serialize_json:
+            self.set_json(key, result, ex=ex)
+        else:
+            self.set(key, str(result), ex=ex)
+
+        # Clean up lock
+        self.delete(lock_key)
+
+        self.log.info("Computed and cached value", key=key)
+        return result
+
+    def check_rate_limit(
+        self,
+        key: str,
+        max_requests: int,
+        window_seconds: int,
+        sliding: bool = True,
+    ) -> tuple[bool, int]:
+        """Check if rate limit is exceeded for a key.
+
+        Args:
+            key: Rate limit key (e.g., "user:123:api_calls")
+            max_requests: Maximum number of requests allowed in window
+            window_seconds: Time window in seconds
+            sliding: Use sliding window (True) or fixed window (False)
+
+        Returns:
+            Tuple of (is_allowed, remaining_requests)
+
+        Example:
+            # Sliding window (default)
+            is_allowed, remaining = redis_service.check_rate_limit(
+                "user:123:api",
+                max_requests=100,
+                window_seconds=3600,
+                sliding=True
+            )
+
+            # Fixed window
+            is_allowed, remaining = redis_service.check_rate_limit(
+                "user:123:api",
+                max_requests=100,
+                window_seconds=3600,
+                sliding=False
+            )
+        """
+        self.log.debug(
+            "Checking rate limit",
+            key=key,
+            max_requests=max_requests,
+            window_seconds=window_seconds,
+            sliding=sliding,
+        )
+
+        if sliding:
+            return self._check_rate_limit_sliding(key, max_requests, window_seconds)
+        return self._check_rate_limit_fixed(key, max_requests, window_seconds)
+
+    def _check_rate_limit_sliding(
+        self, key: str, max_requests: int, window_seconds: int
+    ) -> tuple[bool, int]:
+        """Check rate limit using sliding window with sorted set.
+
+        Args:
+            key: Rate limit key
+            max_requests: Maximum requests allowed
+            window_seconds: Window size in seconds
+
+        Returns:
+            Tuple of (is_allowed, remaining_requests)
+        """
+        now = time.time()
+        window_start = now - window_seconds
+
+        with self.pipeline() as pipe:
+            # Remove old entries
+            pipe.zremrangebyscore(key, 0, window_start)
+            # Count current requests in window
+            pipe.zcard(key)
+            # Add current request timestamp
+            pipe.zadd(key, {str(now): now})
+            # Set expiration on the sorted set
+            pipe.expire(key, window_seconds)
+            results = pipe.execute()
+
+        current_count = results[1]
+        remaining = max(0, max_requests - current_count - 1)
+        is_allowed = current_count < max_requests
+
+        self.log.info(
+            "Sliding window rate limit check",
+            key=key,
+            current=current_count,
+            max=max_requests,
+            allowed=is_allowed,
+            remaining=remaining,
+        )
+
+        return is_allowed, remaining
+
+    def _check_rate_limit_fixed(
+        self, key: str, max_requests: int, window_seconds: int
+    ) -> tuple[bool, int]:
+        """Check rate limit using fixed window with counter.
+
+        Args:
+            key: Rate limit key
+            max_requests: Maximum requests allowed
+            window_seconds: Window size in seconds
+
+        Returns:
+            Tuple of (is_allowed, remaining_requests)
+        """
+        current_count = self.incr(key, 1)
+
+        # Set expiration only on first request
+        if current_count == 1:
+            self.expire(key, window_seconds)
+
+        remaining = max(0, max_requests - current_count)
+        is_allowed = current_count <= max_requests
+
+        self.log.info(
+            "Fixed window rate limit check",
+            key=key,
+            current=current_count,
+            max=max_requests,
+            allowed=is_allowed,
+            remaining=remaining,
+        )
+
+        return is_allowed, remaining
 
     def close(self) -> None:
         """Close the Redis connection."""
