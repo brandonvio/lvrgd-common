@@ -40,7 +40,7 @@ def service_with_client(
     valid_config: MinioConfig,
 ) -> tuple[MinioService, Mock]:
     """Create a MinioService instance with a mocked client."""
-    with patch("services.minio.minio_service.Minio") as minio_ctor:
+    with patch("lvrgd.common.services.minio.minio_service.Minio") as minio_ctor:
         client_instance = Mock()
         minio_ctor.return_value = client_instance
         service = MinioService(mock_logger, valid_config)
@@ -56,7 +56,7 @@ class TestInitialization:
         valid_config: MinioConfig,
     ) -> None:
         """Ensure the MinIO client receives the correct parameters."""
-        with patch("services.minio.minio_service.Minio") as minio_ctor:
+        with patch("lvrgd.common.services.minio.minio_service.Minio") as minio_ctor:
             client_instance = Mock()
             minio_ctor.return_value = client_instance
 
@@ -81,7 +81,7 @@ class TestInitialization:
         """Auto-creation should invoke bucket creation workflow."""
         config = valid_config.model_copy(update={"auto_create_bucket": True})
 
-        with patch("services.minio.minio_service.Minio") as minio_ctor:
+        with patch("lvrgd.common.services.minio.minio_service.Minio") as minio_ctor:
             client_instance = Mock()
             client_instance.bucket_exists.return_value = False
             minio_ctor.return_value = client_instance
@@ -102,7 +102,7 @@ class TestInitialization:
         """Errors during initialization should be logged and propagated."""
         with (
             patch(
-                "services.minio.minio_service.Minio",
+                "lvrgd.common.services.minio.minio_service.Minio",
                 side_effect=S3Error(
                     "code",
                     "message",
@@ -365,7 +365,7 @@ class TestObjectOperations:
     ) -> None:
         """Calling object operations without a bucket should raise when no default exists."""
         config = valid_config.model_copy(update={"default_bucket": None})
-        with patch("services.minio.minio_service.Minio") as minio_ctor:
+        with patch("lvrgd.common.services.minio.minio_service.Minio") as minio_ctor:
             client_instance = Mock()
             minio_ctor.return_value = client_instance
             service = MinioService(mock_logger, config)

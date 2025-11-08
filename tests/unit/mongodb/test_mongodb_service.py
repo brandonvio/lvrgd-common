@@ -69,7 +69,7 @@ def config_without_auth() -> MongoConfig:
 @pytest.fixture
 def mock_mongo_client() -> Iterator[Mock]:
     """Create a mock MongoDB client."""
-    with patch("services.mongodb.mongodb_service.MongoClient") as mock_client:
+    with patch("lvrgd.common.services.mongodb.mongodb_service.MongoClient") as mock_client:
         yield mock_client
 
 
@@ -90,6 +90,10 @@ def mongo_service(
         mock_collection = Mock()
         mock_db.__getitem__ = Mock(return_value=mock_collection)
         service._db = mock_db  # type: ignore[attr-defined]
+
+        # Ensure the client's close method is mocked
+        service._client = Mock()  # type: ignore[attr-defined]
+        service._client.close = Mock()  # type: ignore[attr-defined]
 
         return service
 
