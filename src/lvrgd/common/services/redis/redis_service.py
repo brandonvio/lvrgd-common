@@ -674,7 +674,9 @@ class RedisService:
         )
 
         try:
-            results = self._client.ft(index_name).search(query, query_params={"vector": vector_bytes})
+            results = self._client.ft(index_name).search(
+                query, query_params={"vector": vector_bytes}
+            )
             self.log.info(
                 "Vector search completed",
                 index_name=index_name,
