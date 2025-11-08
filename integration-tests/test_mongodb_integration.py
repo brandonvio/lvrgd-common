@@ -267,3 +267,201 @@ class TestMongoDBIntegration:
         finally:
             # Cleanup
             mongo_service.get_collection(collection).drop()
+
+    def test_find_one_model(self, mongo_service: MongoService) -> None:
+        """Test finding and deserializing single document to Pydantic model."""
+        collection = f"test_collection_{uuid.uuid4().hex[:8]}"
+
+        try:
+            # Insert test document
+            doc = {"name": "Alice", "value": 25, "active": True}
+            mongo_service.insert_one(collection, doc)
+
+            # Find and deserialize to model
+            result = mongo_service.find_one_model(collection, {"name": "Alice"}, MongoDocument)
+
+            # Verify model instance
+            assert result is not None
+            assert isinstance(result, MongoDocument)
+            assert result.name == "Alice"
+            assert result.value == 25
+            assert result.active is True
+
+            # Test not found returns None
+            not_found = mongo_service.find_one_model(
+                collection, {"name": "NonExistent"}, MongoDocument
+            )
+            assert not_found is None
+
+        finally:
+            # Cleanup
+            mongo_service.get_collection(collection).drop()
+
+    def test_insert_one_model(self, mongo_service: MongoService) -> None:
+        """Test inserting Pydantic model as document."""
+        collection = f"test_collection_{uuid.uuid4().hex[:8]}"
+
+        try:
+            # Create and insert model
+            model = MongoDocument(name="Bob", value=35, active=False)
+            result = mongo_service.insert_one_model(collection, model)
+
+            # Verify insertion
+            assert result.inserted_id is not None
+
+            # Verify document in database
+            found = mongo_service.find_one(collection, {"name": "Bob"})
+            assert found is not None
+            assert found["name"] == "Bob"
+            assert found["value"] == 35
+            assert found["active"] is False
+
+        finally:
+            # Cleanup
+            mongo_service.get_collection(collection).drop()
+
+    def test_find_many_models(self, mongo_service: MongoService) -> None:
+        """Test finding and deserializing multiple documents to Pydantic models."""
+        collection = f"test_collection_{uuid.uuid4().hex[:8]}"
+
+        try:
+            # Insert test documents
+            docs = [
+                {"name": "Alice", "value": 25, "active": True},
+                {"name": "Bob", "value": 35, "active": False},
+                {"name": "Charlie", "value": 45, "active": True},
+            ]
+            mongo_service.insert_many(collection, docs)
+
+            # Find all and deserialize to models
+            results = mongo_service.find_many_models(collection, {}, MongoDocument)
+
+            # Verify models
+            assert len(results) == 3
+            assert all(isinstance(r, MongoDocument) for r in results)
+            assert results[0].name == "Alice"
+            assert results[1].name == "Bob"
+            assert results[2].name == "Charlie"
+
+            # Test with query filter
+            active_results = mongo_service.find_many_models(
+                collection, {"active": True}, MongoDocument
+            )
+            assert len(active_results) == 2
+            assert all(r.active for r in active_results)
+
+            # Test with pagination
+            paginated = mongo_service.find_many_models(
+                collection,
+                {},
+                MongoDocument,
+                sort=[("value", 1)],
+                limit=2,
+                skip=1,
+            )
+            assert len(paginated) == 2
+            assert paginated[0].name == "Bob"
+            assert paginated[1].name == "Charlie"
+
+        finally:
+            # Cleanup
+            mongo_service.get_collection(collection).drop()
+
+    def test_insert_many_models(self, mongo_service: MongoService) -> None:
+        """Test inserting multiple Pydantic models as documents."""
+        collection = f"test_collection_{uuid.uuid4().hex[:8]}"
+
+        try:
+            # Create models
+            models = [
+                MongoDocument(name="Alice", value=25),
+                MongoDocument(name="Bob", value=35, active=False),
+                MongoDocument(name="Charlie", value=45),
+            ]
+
+            # Insert models
+            inserted_ids = mongo_service.insert_many_models(collection, models)
+
+            # Verify insertions
+            assert len(inserted_ids) == 3
+
+            # Verify documents in database
+            found = mongo_service.find_many(collection, {})
+            assert len(found) == 3
+            assert found[0]["name"] == "Alice"
+            assert found[1]["name"] == "Bob"
+            assert found[2]["name"] == "Charlie"
+
+        finally:
+            # Cleanup
+            mongo_service.get_collection(collection).drop()
+
+    def test_update_one_model(self, mongo_service: MongoService) -> None:
+        """Test updating single document using Pydantic model."""
+        collection = f"test_collection_{uuid.uuid4().hex[:8]}"
+
+        try:
+            # Insert initial document
+            doc = {"name": "Alice", "value": 25, "active": True}
+            mongo_service.insert_one(collection, doc)
+
+            # Update using model
+            update_model = MongoDocument(name="Alice Updated", value=30, active=False)
+            result = mongo_service.update_one_model(collection, {"name": "Alice"}, update_model)
+
+            # Verify update
+            assert result.modified_count == 1
+            assert result.matched_count == 1
+
+            # Verify updated document
+            updated = mongo_service.find_one(collection, {"name": "Alice Updated"})
+            assert updated is not None
+            assert updated["value"] == 30
+            assert updated["active"] is False
+
+            # Test upsert
+            new_model = MongoDocument(name="NewDoc", value=100)
+            upsert_result = mongo_service.update_one_model(
+                collection, {"name": "NewDoc"}, new_model, upsert=True
+            )
+            assert upsert_result.upserted_id is not None
+
+            # Verify upserted document
+            upserted = mongo_service.find_one(collection, {"name": "NewDoc"})
+            assert upserted is not None
+            assert upserted["value"] == 100
+
+        finally:
+            # Cleanup
+            mongo_service.get_collection(collection).drop()
+
+    def test_update_many_models(self, mongo_service: MongoService) -> None:
+        """Test updating multiple documents using Pydantic model."""
+        collection = f"test_collection_{uuid.uuid4().hex[:8]}"
+
+        try:
+            # Insert test documents
+            docs = [
+                {"name": "doc1", "value": 10, "active": True},
+                {"name": "doc2", "value": 20, "active": True},
+                {"name": "doc3", "value": 30, "active": False},
+            ]
+            mongo_service.insert_many(collection, docs)
+
+            # Update multiple using model
+            update_model = MongoDocument(name="Updated", value=999, active=False)
+            result = mongo_service.update_many_models(collection, {"active": True}, update_model)
+
+            # Verify updates
+            assert result.modified_count == 2
+            assert result.matched_count == 2
+
+            # Verify updated documents
+            updated_docs = mongo_service.find_many(collection, {"name": "Updated"})
+            assert len(updated_docs) == 2
+            assert all(d["value"] == 999 for d in updated_docs)
+            assert all(d["active"] is False for d in updated_docs)
+
+        finally:
+            # Cleanup
+            mongo_service.get_collection(collection).drop()
