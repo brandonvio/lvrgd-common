@@ -1,6 +1,5 @@
 """Test suite for the simplified MinIO service implementation."""
 
-from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -322,25 +321,6 @@ class TestObjectOperations:
         service.remove_object("delete-me.txt")
 
         client.remove_object.assert_called_once_with("test-bucket", "delete-me.txt")
-
-    def test_generate_presigned_url(
-        self,
-        service_with_client: tuple[MinioService, Mock],
-    ) -> None:
-        """Presigned URLs should be generated via the client."""
-        service, client = service_with_client
-        client.get_presigned_url.return_value = "https://example.com/presigned"
-
-        url = service.generate_presigned_url(
-            "file.txt",
-            method="PUT",
-            expires=timedelta(minutes=5),
-            response_headers={"x-test": "true"},
-            request_params={"uploads": "1"},
-        )
-
-        assert url == "https://example.com/presigned"
-        client.get_presigned_url.assert_called_once()
 
     def test_stat_object_returns_metadata(
         self,

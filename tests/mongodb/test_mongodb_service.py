@@ -281,7 +281,7 @@ class TestInsertOperations:
         )
         mongo_service.log.info.assert_called_with(  # type: ignore[attr-defined]
             "Successfully inserted document",
-            inserted_id=inserted_id,
+            inserted_id=str(inserted_id),
             collection=collection_name,
         )
 

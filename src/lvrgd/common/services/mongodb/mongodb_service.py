@@ -167,7 +167,7 @@ class MongoService:
         result = collection.insert_one(document, session=session)
         self.log.info(
             "Successfully inserted document",
-            inserted_id=result.inserted_id,
+            inserted_id=str(result.inserted_id),
             collection=collection_name,
         )
         return result
@@ -237,7 +237,7 @@ class MongoService:
         if result:
             self.log.debug(
                 "Found document",
-                doc_id=result.get("_id"),
+                doc_id=str(result.get("_id")),
                 collection=collection_name,
             )
         else:
@@ -330,7 +330,7 @@ class MongoService:
             modified=result.modified_count,
             collection=collection_name,
             matched=result.matched_count,
-            upserted_id=result.upserted_id,
+            upserted_id=str(result.upserted_id) if result.upserted_id else None,
         )
         return result
 

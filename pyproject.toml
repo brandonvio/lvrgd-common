@@ -34,6 +34,7 @@ dev = [
     "pytest>=8.4.2",
     "pytest-asyncio>=1.2.0",
     "pytest-mock>=3.15.1",
+    "python-dotenv>=1.0.0",
     "ruff>=0.13.1",
     "flake8>=7.3.0",
     "black>=25.9.0",
@@ -58,6 +59,7 @@ dev = [
     "pytest>=8.4.2",
     "pytest-asyncio>=1.2.0",
     "pytest-mock>=3.15.1",
+    "python-dotenv>=1.0.0",
 ]
 
 [tool.ruff]
@@ -88,6 +90,26 @@ lint.ignore = [
     "INP001",  # Tests don't need __init__.py
     "ARG001",  # Unused function arguments in fixtures
     "ARG002",  # Unused method arguments in test methods
+]
+"integration-tests/**/*.py" = [
+    "D100",    # Don't require module docstrings in integration tests
+    "D103",    # Don't require function docstrings in integration tests
+    "S101",    # Allow assert statements in integration tests
+    "S105",    # Allow hardcoded passwords in integration tests
+    "S106",    # Allow hardcoded password arguments in integration tests
+    "S108",    # Allow temp file usage in integration tests
+    "S306",    # Allow insecure mktemp in integration tests
+    "SLF001",  # Allow private member access in integration tests
+    "PLR2004", # Allow magic values in integration tests
+    "INP001",  # Integration tests don't need __init__.py
+    "ARG001",  # Unused function arguments in fixtures
+    "ANN001",  # Allow missing type annotation for logger fixture
+    "N999",    # Allow integration-tests module name with hyphen
+    "TRY003",  # Allow string literals in exceptions for test assertions
+    "TRY301",  # Allow raise in try blocks for testing error handling
+    "EM101",   # Allow string literals in exceptions for test messages
+    "B011",    # Allow assert False in tests
+    "PT015",   # Allow assert False in exception tests
 ]
 "**/minio_models.py" = [
     "S105",    # Example credentials in Field examples
