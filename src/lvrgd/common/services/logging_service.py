@@ -200,3 +200,15 @@ class LoggingService:
             **kwargs: Additional context fields
         """
         logger.opt(depth=1).critical(message, **kwargs)
+
+    def exception(self, message: str, **kwargs: Any) -> None:
+        """Log an exception message with full traceback details.
+
+        Captures the current exception and logs it with complete traceback information.
+        Should be called from within an exception handler.
+
+        Args:
+            message: Log message
+            **kwargs: Additional context fields
+        """
+        logger.opt(depth=1, exception=True).error(message, **kwargs)

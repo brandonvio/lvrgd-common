@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import io
-import logging
 from datetime import timedelta
 from typing import Any
 
 from minio import Minio
 from minio.error import S3Error
 
+from ..logging_service import LoggingService
 from .minio_models import MinioConfig
 
 # Error messages
@@ -19,12 +19,17 @@ ERROR_BUCKET_REQUIRED = "Bucket name must be provided when no default bucket is 
 class MinioService:
     """High-level wrapper around the official MinIO Python client."""
 
-    def __init__(self, logger: logging.Logger, config: MinioConfig) -> None:
-        """Create a new MinioService instance."""
+    def __init__(self, logger: LoggingService, config: MinioConfig) -> None:
+        """Create a new MinioService instance.
+
+        Args:
+            logger: LoggingService instance for structured logging
+            config: MinIO configuration model
+        """
         self.log = logger
         self.config = config
 
-        self.log.info("Initializing MinIO client for endpoint: %s", config.endpoint)
+        self.log.info("Initializing MinIO client", endpoint=config.endpoint)
 
         try:
             self._client = Minio(
@@ -41,8 +46,8 @@ class MinioService:
                     self.ensure_bucket(config.default_bucket)
                 else:
                     self.log.debug(
-                        "Using configured default bucket: %s",
-                        config.default_bucket,
+                        "Using configured default bucket",
+                        bucket=config.default_bucket,
                     )
 
         except Exception:
@@ -77,14 +82,14 @@ class MinioService:
             raise
         else:
             bucket_names = [bucket.name for bucket in buckets]
-            self.log.debug("Successfully listed %d bucket(s)", len(bucket_names))
+            self.log.debug("Successfully listed buckets", count=len(bucket_names))
             return bucket_names
 
     def bucket_exists(self, bucket_name: str) -> bool:
         """Check whether a bucket exists."""
-        self.log.debug("Checking if bucket exists: %s", bucket_name)
+        self.log.debug("Checking if bucket exists", bucket=bucket_name)
         exists = self._client.bucket_exists(bucket_name)
-        self.log.info("Bucket %s exists: %s", bucket_name, exists)
+        self.log.info("Bucket exists check", bucket=bucket_name, exists=exists)
         return exists
 
     def ensure_bucket(self, bucket_name: str) -> None:
@@ -92,16 +97,16 @@ class MinioService:
         if self.bucket_exists(bucket_name):
             return
 
-        self.log.info("Creating bucket: %s", bucket_name)
+        self.log.info("Creating bucket", bucket=bucket_name)
         self._client.make_bucket(bucket_name, location=self.config.region)
-        self.log.info("Bucket created successfully: %s", bucket_name)
+        self.log.info("Bucket created successfully", bucket=bucket_name)
 
     def list_buckets(self) -> list[str]:
         """List all buckets available to the credentials."""
         self.log.debug("Listing buckets")
         buckets = self._client.list_buckets()
         bucket_names = [bucket.name for bucket in buckets]
-        self.log.info("Found %d bucket(s)", len(bucket_names))
+        self.log.info("Found buckets", count=len(bucket_names))
         return bucket_names
 
     # ------------------------------------------------------------------
@@ -119,10 +124,10 @@ class MinioService:
         """Upload a file from disk to the specified bucket."""
         resolved_bucket = self._resolve_bucket(bucket_name)
         self.log.debug(
-            "Uploading file '%s' to bucket '%s' as object '%s'",
-            file_path,
-            resolved_bucket,
-            object_name,
+            "Uploading file to bucket",
+            file_path=file_path,
+            bucket=resolved_bucket,
+            object_name=object_name,
         )
         result = self._client.fput_object(
             resolved_bucket,
@@ -132,10 +137,10 @@ class MinioService:
             metadata=metadata,
         )
         self.log.info(
-            "Uploaded file '%s' to bucket '%s' (etag=%s)",
-            object_name,
-            resolved_bucket,
-            result.etag,
+            "Uploaded file to bucket",
+            object_name=object_name,
+            bucket=resolved_bucket,
+            etag=result.etag,
         )
         return result.object_name
 
@@ -149,17 +154,17 @@ class MinioService:
         """Download an object from MinIO and store it on disk."""
         resolved_bucket = self._resolve_bucket(bucket_name)
         self.log.debug(
-            "Downloading object '%s' from bucket '%s' to '%s'",
-            object_name,
-            resolved_bucket,
-            file_path,
+            "Downloading object from bucket",
+            object_name=object_name,
+            bucket=resolved_bucket,
+            file_path=file_path,
         )
         self._client.fget_object(resolved_bucket, object_name, file_path)
         self.log.info(
-            "Downloaded object '%s' from bucket '%s' to '%s'",
-            object_name,
-            resolved_bucket,
-            file_path,
+            "Downloaded object from bucket",
+            object_name=object_name,
+            bucket=resolved_bucket,
+            file_path=file_path,
         )
 
     def upload_data(
@@ -176,10 +181,10 @@ class MinioService:
         data_stream = io.BytesIO(data)
         length = len(data)
         self.log.debug(
-            "Uploading %d bytes to bucket '%s' as object '%s'",
-            length,
-            resolved_bucket,
-            object_name,
+            "Uploading bytes to bucket",
+            bytes=length,
+            bucket=resolved_bucket,
+            object_name=object_name,
         )
         result = self._client.put_object(
             resolved_bucket,
@@ -190,10 +195,10 @@ class MinioService:
             metadata=metadata,
         )
         self.log.info(
-            "Uploaded %d bytes to bucket '%s' (etag=%s)",
-            length,
-            resolved_bucket,
-            result.etag,
+            "Uploaded bytes to bucket",
+            bytes=length,
+            bucket=resolved_bucket,
+            etag=result.etag,
         )
         return result.object_name
 
@@ -206,18 +211,18 @@ class MinioService:
         """Download an object's contents directly into memory."""
         resolved_bucket = self._resolve_bucket(bucket_name)
         self.log.debug(
-            "Downloading object '%s' from bucket '%s' into memory",
-            object_name,
-            resolved_bucket,
+            "Downloading object into memory",
+            object_name=object_name,
+            bucket=resolved_bucket,
         )
         response = self._client.get_object(resolved_bucket, object_name)
         try:
             data = response.read()
             self.log.info(
-                "Downloaded object '%s' from bucket '%s' (%d bytes)",
-                object_name,
-                resolved_bucket,
-                len(data),
+                "Downloaded object into memory",
+                object_name=object_name,
+                bucket=resolved_bucket,
+                bytes=len(data),
             )
             return data
         finally:
@@ -234,10 +239,10 @@ class MinioService:
         """List objects in a bucket, returning their names."""
         resolved_bucket = self._resolve_bucket(bucket_name)
         self.log.debug(
-            "Listing objects in bucket '%s' (prefix=%s, recursive=%s)",
-            resolved_bucket,
-            prefix,
-            recursive,
+            "Listing objects in bucket",
+            bucket=resolved_bucket,
+            prefix=prefix,
+            recursive=recursive,
         )
         objects = self._client.list_objects(
             resolved_bucket,
@@ -246,9 +251,9 @@ class MinioService:
         )
         object_names = [obj.object_name for obj in objects]
         self.log.info(
-            "Found %d object(s) in bucket '%s'",
-            len(object_names),
-            resolved_bucket,
+            "Found objects in bucket",
+            count=len(object_names),
+            bucket=resolved_bucket,
         )
         return object_names
 
@@ -261,15 +266,15 @@ class MinioService:
         """Remove a single object from a bucket."""
         resolved_bucket = self._resolve_bucket(bucket_name)
         self.log.debug(
-            "Removing object '%s' from bucket '%s'",
-            object_name,
-            resolved_bucket,
+            "Removing object from bucket",
+            object_name=object_name,
+            bucket=resolved_bucket,
         )
         self._client.remove_object(resolved_bucket, object_name)
         self.log.info(
-            "Removed object '%s' from bucket '%s'",
-            object_name,
-            resolved_bucket,
+            "Removed object from bucket",
+            object_name=object_name,
+            bucket=resolved_bucket,
         )
 
     def generate_presigned_url(
@@ -285,10 +290,10 @@ class MinioService:
         """Generate a presigned URL for accessing an object."""
         resolved_bucket = self._resolve_bucket(bucket_name)
         self.log.debug(
-            "Generating presigned URL for object '%s' (method=%s, expires=%s)",
-            object_name,
-            method,
-            expires,
+            "Generating presigned URL for object",
+            object_name=object_name,
+            method=method,
+            expires=str(expires),
         )
         url = self._client.get_presigned_url(
             method,
@@ -298,7 +303,7 @@ class MinioService:
             response_headers=response_headers,
             request_params=request_params,
         )
-        self.log.info("Generated presigned URL for object '%s'", object_name)
+        self.log.info("Generated presigned URL for object", object_name=object_name)
         return url
 
     def stat_object(
@@ -310,14 +315,14 @@ class MinioService:
         """Retrieve metadata about an object."""
         resolved_bucket = self._resolve_bucket(bucket_name)
         self.log.debug(
-            "Fetching metadata for object '%s' in bucket '%s'",
-            object_name,
-            resolved_bucket,
+            "Fetching metadata for object",
+            object_name=object_name,
+            bucket=resolved_bucket,
         )
         metadata = self._client.stat_object(resolved_bucket, object_name)
         self.log.info(
-            "Fetched metadata for object '%s' in bucket '%s'",
-            object_name,
-            resolved_bucket,
+            "Fetched metadata for object",
+            object_name=object_name,
+            bucket=resolved_bucket,
         )
         return metadata

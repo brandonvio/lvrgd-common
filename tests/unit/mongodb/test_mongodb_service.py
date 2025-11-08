@@ -9,7 +9,6 @@ This module contains tests for the MongoDB service including:
 - Aggregation operations
 """
 
-import logging
 from collections.abc import Iterator
 from typing import Any
 from unittest.mock import Mock, patch
@@ -19,21 +18,20 @@ from bson.objectid import ObjectId
 from pymongo.errors import ConnectionFailure, OperationFailure
 from pymongo.results import BulkWriteResult, DeleteResult, InsertOneResult, UpdateResult
 
+from lvrgd.common.services.logging_service import LoggingService
 from lvrgd.common.services.mongodb.mongodb_models import MongoConfig
 from lvrgd.common.services.mongodb.mongodb_service import MongoService
 
-# assert usage in tests is acceptable
-# accessing private members in tests is acceptable
 # ruff: noqa: ARG001,ARG002  # unused arguments in fixtures/test methods are expected
 # ruff: noqa: S106  # hardcoded passwords in tests are acceptable
-# ruff: noqa: FBT003  # boolean literals in function calls ok in tests
+# boolean literals in function calls ok in tests
 # ruff: noqa: PLC0415  # imports in functions acceptable in tests
 
 
 @pytest.fixture
 def mock_logger() -> Mock:
     """Create a mock logger for testing."""
-    return Mock(spec=logging.Logger)
+    return Mock(spec=LoggingService)
 
 
 @pytest.fixture
@@ -113,8 +111,8 @@ class TestMongoServiceInitialization:
             service = MongoService(mock_logger, valid_config)
 
             mock_logger.info.assert_any_call(
-                "Initializing MongoDB connection to database: %s",
-                valid_config.database,
+                "Initializing MongoDB connection",
+                database=valid_config.database,
             )
 
             expected_params: dict[str, Any] = {
@@ -278,13 +276,13 @@ class TestInsertOperations:
 
         # Verify logging
         mongo_service.log.debug.assert_called_with(  # type: ignore[attr-defined]
-            "Inserting document into collection: %s",
-            collection_name,
+            "Inserting document",
+            collection=collection_name,
         )
         mongo_service.log.info.assert_called_with(  # type: ignore[attr-defined]
-            "Successfully inserted document with ID %s into collection: %s",
-            inserted_id,
-            collection_name,
+            "Successfully inserted document",
+            inserted_id=inserted_id,
+            collection=collection_name,
         )
 
     def test_insert_many_success(self, mongo_service: MongoService) -> None:
@@ -310,10 +308,10 @@ class TestInsertOperations:
 
         # Verify logging
         mongo_service.log.debug.assert_called_with(  # type: ignore[attr-defined]
-            "Inserting %d documents into collection: %s (ordered=%s)",
-            2,
-            collection_name,
-            True,
+            "Inserting documents",
+            count=2,
+            collection=collection_name,
+            ordered=True,
         )
 
 
@@ -342,9 +340,9 @@ class TestFindOperations:
 
         # Verify logging
         mongo_service.log.debug.assert_any_call(  # type: ignore[attr-defined]
-            "Finding document in collection: %s with query: %s",
-            collection_name,
-            query,
+            "Finding document",
+            collection=collection_name,
+            query=query,
         )
 
     def test_find_one_not_found(self, mongo_service: MongoService) -> None:
@@ -360,8 +358,8 @@ class TestFindOperations:
 
         assert result is None
         mongo_service.log.debug.assert_any_call(  # type: ignore[attr-defined]
-            "No document found in collection: %s",
-            collection_name,
+            "No document found",
+            collection=collection_name,
         )
 
     def test_find_many_success(self, mongo_service: MongoService) -> None:
@@ -401,9 +399,9 @@ class TestFindOperations:
 
         # Verify logging
         mongo_service.log.info.assert_called_with(  # type: ignore[attr-defined]
-            "Found %d documents in collection: %s",
-            2,
-            collection_name,
+            "Found documents",
+            count=2,
+            collection=collection_name,
         )
 
 
@@ -436,11 +434,11 @@ class TestUpdateOperations:
 
         # Verify logging
         mongo_service.log.info.assert_called_with(  # type: ignore[attr-defined]
-            "Updated %d document(s) in collection: %s (matched=%d, upserted_id=%s)",
-            1,
-            collection_name,
-            1,
-            None,
+            "Updated document",
+            modified=1,
+            collection=collection_name,
+            matched=1,
+            upserted_id=None,
         )
 
     def test_update_many_success(self, mongo_service: MongoService) -> None:
@@ -488,9 +486,9 @@ class TestDeleteOperations:
 
         # Verify logging
         mongo_service.log.info.assert_called_with(  # type: ignore[attr-defined]
-            "Deleted %d document(s) from collection: %s",
-            1,
-            collection_name,
+            "Deleted document",
+            deleted=1,
+            collection=collection_name,
         )
 
     def test_delete_many_success(self, mongo_service: MongoService) -> None:
@@ -530,9 +528,9 @@ class TestAggregationOperations:
 
         # Verify logging
         mongo_service.log.debug.assert_any_call(  # type: ignore[attr-defined]
-            "Found %d documents matching query in collection: %s",
-            expected_count,
-            collection_name,
+            "Found matching documents",
+            count=expected_count,
+            collection=collection_name,
         )
 
     def test_aggregate_success(self, mongo_service: MongoService) -> None:
@@ -560,9 +558,9 @@ class TestAggregationOperations:
 
         # Verify logging
         mongo_service.log.info.assert_called_with(  # type: ignore[attr-defined]
-            "Aggregation completed on collection: %s, returned %d results",
-            collection_name,
-            2,
+            "Aggregation completed",
+            collection=collection_name,
+            results=2,
         )
 
 
@@ -586,9 +584,9 @@ class TestIndexOperations:
 
         # Verify logging
         mongo_service.log.info.assert_called_with(  # type: ignore[attr-defined]
-            "Successfully created index '%s' on collection: %s",
-            expected_index_name,
-            collection_name,
+            "Successfully created index",
+            index_name=expected_index_name,
+            collection=collection_name,
         )
 
     def test_create_index_compound_unique(self, mongo_service: MongoService) -> None:
@@ -642,14 +640,13 @@ class TestBulkOperations:
 
         # Verify logging
         mongo_service.log.info.assert_called_with(  # type: ignore[attr-defined]
-            "Bulk write completed on collection: %s - "
-            "inserted: %d, matched: %d, modified: %d, deleted: %d, upserted: %d",
-            collection_name,
-            1,
-            1,
-            1,
-            1,
-            0,
+            "Bulk write completed",
+            collection=collection_name,
+            inserted=1,
+            matched=1,
+            modified=1,
+            deleted=1,
+            upserted=0,
         )
 
 

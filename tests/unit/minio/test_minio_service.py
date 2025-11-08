@@ -1,6 +1,5 @@
 """Test suite for the simplified MinIO service implementation."""
 
-import logging
 from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -8,6 +7,7 @@ from unittest.mock import Mock, patch
 import pytest
 from minio.error import S3Error
 
+from lvrgd.common.services.logging_service import LoggingService
 from lvrgd.common.services.minio.minio_models import MinioConfig
 from lvrgd.common.services.minio.minio_service import ERROR_BUCKET_REQUIRED, MinioService
 
@@ -17,7 +17,7 @@ from lvrgd.common.services.minio.minio_service import ERROR_BUCKET_REQUIRED, Min
 @pytest.fixture
 def mock_logger() -> Mock:
     """Return a mock logger for service tests."""
-    return Mock(spec=logging.Logger)
+    return Mock(spec=LoggingService)
 
 
 @pytest.fixture

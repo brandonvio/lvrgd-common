@@ -7,7 +7,6 @@ This module provides a clean MongoDB service implementation with:
 - Health check functionality
 """
 
-import logging
 from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
@@ -30,6 +29,7 @@ from pymongo.operations import (
 )
 from pymongo.results import BulkWriteResult, DeleteResult, InsertOneResult, UpdateResult
 
+from ..logging_service import LoggingService
 from .mongodb_models import MongoConfig
 
 
@@ -38,22 +38,21 @@ class MongoService:
 
     def __init__(
         self,
-        logger: logging.Logger,
+        logger: LoggingService,
         config: MongoConfig,
     ) -> None:
         """Initialize MongoService.
 
         Args:
-            logger: Standard Python logger instance
+            logger: LoggingService instance for structured logging
             config: MongoDB configuration model
-
         """
         self.log = logger
         self.config = config
 
         self.log.info(
-            "Initializing MongoDB connection to database: %s",
-            config.database,
+            "Initializing MongoDB connection",
+            database=config.database,
         )
 
         # Build connection parameters
@@ -80,8 +79,8 @@ class MongoService:
             # Verify connection
             server_info = self.ping()
             self.log.info(
-                "Successfully connected to MongoDB. Server version: %s",
-                server_info.get("version", "unknown"),
+                "Successfully connected to MongoDB",
+                version=server_info.get("version", "unknown"),
             )
 
         except Exception:
@@ -162,13 +161,13 @@ class MongoService:
             Result of the insert operation
 
         """
-        self.log.debug("Inserting document into collection: %s", collection_name)
+        self.log.debug("Inserting document", collection=collection_name)
         collection = self.get_collection(collection_name)
         result = collection.insert_one(document, session=session)
         self.log.info(
-            "Successfully inserted document with ID %s into collection: %s",
-            result.inserted_id,
-            collection_name,
+            "Successfully inserted document",
+            inserted_id=result.inserted_id,
+            collection=collection_name,
         )
         return result
 
@@ -194,17 +193,17 @@ class MongoService:
         """
         doc_count = len(documents)
         self.log.debug(
-            "Inserting %d documents into collection: %s (ordered=%s)",
-            doc_count,
-            collection_name,
-            ordered,
+            "Inserting documents",
+            count=doc_count,
+            collection=collection_name,
+            ordered=ordered,
         )
         collection = self.get_collection(collection_name)
         result = collection.insert_many(documents, ordered=ordered, session=session)
         self.log.info(
-            "Successfully inserted %d documents into collection: %s",
-            len(result.inserted_ids),
-            collection_name,
+            "Successfully inserted documents",
+            count=len(result.inserted_ids),
+            collection=collection_name,
         )
         return result.inserted_ids
 
@@ -228,20 +227,20 @@ class MongoService:
 
         """
         self.log.debug(
-            "Finding document in collection: %s with query: %s",
-            collection_name,
-            query,
+            "Finding document",
+            collection=collection_name,
+            query=query,
         )
         collection = self.get_collection(collection_name)
         result = collection.find_one(query, projection, session=session)
         if result:
             self.log.debug(
-                "Found document with ID %s in collection: %s",
-                result.get("_id"),
-                collection_name,
+                "Found document",
+                doc_id=result.get("_id"),
+                collection=collection_name,
             )
         else:
-            self.log.debug("No document found in collection: %s", collection_name)
+            self.log.debug("No document found", collection=collection_name)
         return result
 
     def find_many(
@@ -271,11 +270,11 @@ class MongoService:
 
         """
         self.log.debug(
-            "Finding documents in collection: %s with query: %s (limit=%d, skip=%d)",
-            collection_name,
-            query,
-            limit,
-            skip,
+            "Finding documents",
+            collection=collection_name,
+            query=query,
+            limit=limit,
+            skip=skip,
         )
         collection = self.get_collection(collection_name)
         cursor = collection.find(query, projection, session=session)
@@ -289,9 +288,9 @@ class MongoService:
 
         results = list(cursor)
         self.log.info(
-            "Found %d documents in collection: %s",
-            len(results),
-            collection_name,
+            "Found documents",
+            count=len(results),
+            collection=collection_name,
         )
         return results
 
@@ -318,19 +317,19 @@ class MongoService:
 
         """
         self.log.debug(
-            "Updating document in collection: %s with query: %s (upsert=%s)",
-            collection_name,
-            query,
-            upsert,
+            "Updating document",
+            collection=collection_name,
+            query=query,
+            upsert=upsert,
         )
         collection = self.get_collection(collection_name)
         result = collection.update_one(query, update, upsert=upsert, session=session)
         self.log.info(
-            "Updated %d document(s) in collection: %s (matched=%d, upserted_id=%s)",
-            result.modified_count,
-            collection_name,
-            result.matched_count,
-            result.upserted_id,
+            "Updated document",
+            modified=result.modified_count,
+            collection=collection_name,
+            matched=result.matched_count,
+            upserted_id=result.upserted_id,
         )
         return result
 
@@ -357,18 +356,18 @@ class MongoService:
 
         """
         self.log.debug(
-            "Updating multiple documents in collection: %s with query: %s (upsert=%s)",
-            collection_name,
-            query,
-            upsert,
+            "Updating multiple documents",
+            collection=collection_name,
+            query=query,
+            upsert=upsert,
         )
         collection = self.get_collection(collection_name)
         result = collection.update_many(query, update, upsert=upsert, session=session)
         self.log.info(
-            "Updated %d document(s) in collection: %s (matched=%d)",
-            result.modified_count,
-            collection_name,
-            result.matched_count,
+            "Updated documents",
+            modified=result.modified_count,
+            collection=collection_name,
+            matched=result.matched_count,
         )
         return result
 
@@ -390,16 +389,16 @@ class MongoService:
 
         """
         self.log.debug(
-            "Deleting document from collection: %s with query: %s",
-            collection_name,
-            query,
+            "Deleting document",
+            collection=collection_name,
+            query=query,
         )
         collection = self.get_collection(collection_name)
         result = collection.delete_one(query, session=session)
         self.log.info(
-            "Deleted %d document(s) from collection: %s",
-            result.deleted_count,
-            collection_name,
+            "Deleted document",
+            deleted=result.deleted_count,
+            collection=collection_name,
         )
         return result
 
@@ -421,16 +420,16 @@ class MongoService:
 
         """
         self.log.debug(
-            "Deleting multiple documents from collection: %s with query: %s",
-            collection_name,
-            query,
+            "Deleting multiple documents",
+            collection=collection_name,
+            query=query,
         )
         collection = self.get_collection(collection_name)
         result = collection.delete_many(query, session=session)
         self.log.info(
-            "Deleted %d document(s) from collection: %s",
-            result.deleted_count,
-            collection_name,
+            "Deleted documents",
+            deleted=result.deleted_count,
+            collection=collection_name,
         )
         return result
 
@@ -452,16 +451,16 @@ class MongoService:
 
         """
         self.log.debug(
-            "Counting documents in collection: %s with query: %s",
-            collection_name,
-            query,
+            "Counting documents",
+            collection=collection_name,
+            query=query,
         )
         collection = self.get_collection(collection_name)
         count = collection.count_documents(query, session=session)
         self.log.debug(
-            "Found %d documents matching query in collection: %s",
-            count,
-            collection_name,
+            "Found matching documents",
+            count=count,
+            collection=collection_name,
         )
         return count
 
@@ -484,16 +483,16 @@ class MongoService:
         """
         pipeline_stages = len(pipeline)
         self.log.debug(
-            "Running aggregation on collection: %s with %d pipeline stages",
-            collection_name,
-            pipeline_stages,
+            "Running aggregation",
+            collection=collection_name,
+            stages=pipeline_stages,
         )
         collection = self.get_collection(collection_name)
         results = list(collection.aggregate(pipeline, session=session))
         self.log.info(
-            "Aggregation completed on collection: %s, returned %d results",
-            collection_name,
-            len(results),
+            "Aggregation completed",
+            collection=collection_name,
+            results=len(results),
         )
         return results
 
@@ -518,17 +517,17 @@ class MongoService:
 
         """
         self.log.debug(
-            "Creating index on collection: %s with keys: %s (unique=%s)",
-            collection_name,
-            keys,
-            unique,
+            "Creating index",
+            collection=collection_name,
+            keys=keys,
+            unique=unique,
         )
         collection = self.get_collection(collection_name)
         index_name = collection.create_index(keys, unique=unique, **kwargs)
         self.log.info(
-            "Successfully created index '%s' on collection: %s",
-            index_name,
-            collection_name,
+            "Successfully created index",
+            index_name=index_name,
+            collection=collection_name,
         )
         return index_name
 
@@ -561,22 +560,21 @@ class MongoService:
         """
         operation_count = len(operations)
         self.log.debug(
-            "Executing bulk write with %d operations on collection: %s (ordered=%s)",
-            operation_count,
-            collection_name,
-            ordered,
+            "Executing bulk write",
+            operations=operation_count,
+            collection=collection_name,
+            ordered=ordered,
         )
         collection = self.get_collection(collection_name)
         result = collection.bulk_write(operations, ordered=ordered, session=session)
         self.log.info(
-            "Bulk write completed on collection: %s - "
-            "inserted: %d, matched: %d, modified: %d, deleted: %d, upserted: %d",
-            collection_name,
-            result.inserted_count,
-            result.matched_count,
-            result.modified_count,
-            result.deleted_count,
-            result.upserted_count,
+            "Bulk write completed",
+            collection=collection_name,
+            inserted=result.inserted_count,
+            matched=result.matched_count,
+            modified=result.modified_count,
+            deleted=result.deleted_count,
+            upserted=result.upserted_count,
         )
         return result
 

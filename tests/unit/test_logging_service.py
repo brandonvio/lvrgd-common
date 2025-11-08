@@ -97,3 +97,14 @@ class TestLoggingService:
         """Test that caller context is captured with depth=1."""
         logging_service.info("test message from test")
         assert mock_console.print.called
+
+    def test_exception_logs_with_traceback(
+        self, logging_service: LoggingService, mock_console: MagicMock
+    ) -> None:
+        """Test that exception method captures exception details."""
+        try:
+            msg = "test error"
+            raise ValueError(msg)
+        except ValueError:
+            logging_service.exception("test exception message", error_type="ValueError")
+        assert mock_console.print.called
