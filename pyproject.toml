@@ -36,22 +36,13 @@ dev = [
     "black>=25.9.0",
 ]
 
-[tool.hatch.build.targets.wheel]
-only-include = []
-
-[tool.hatch.build.targets.wheel.force-include]
-"src/services" = "services"
-
-[tool.hatch.build.targets.sdist]
-exclude = [
-    ".git",
-    ".github",
-    ".venv",
-    ".pytest_cache",
-    ".ruff_cache",
-    "dist",
-    "*.egg-info",
+[tool.hatch.build]
+include = [
+    "src/services/**/*.py",
 ]
+
+[tool.hatch.build.targets.wheel.sources]
+"src" = ""
 
 [tool.uv]
 package = true
