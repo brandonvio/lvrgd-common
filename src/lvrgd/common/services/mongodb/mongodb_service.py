@@ -29,7 +29,8 @@ from pymongo.operations import (
 )
 from pymongo.results import BulkWriteResult, DeleteResult, InsertOneResult, UpdateResult
 
-from ..logging_service import LoggingService
+from lvrgd.common.services.logging_service import LoggingService
+
 from .mongodb_models import MongoConfig
 
 
