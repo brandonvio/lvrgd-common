@@ -24,6 +24,7 @@ dependencies = [
     "minio>=7.2.7",
     "pydantic>=2.11.9",
     "pymongo>=4.15.1",
+    "redis>=5.0.0",
     "rich>=14.2.0",
 ]
 
@@ -80,13 +81,25 @@ lint.ignore = [
     "D103",    # Don't require function docstrings in tests
     "S101",    # Allow assert statements in tests
     "S105",    # Allow hardcoded passwords in tests
+    "S106",    # Allow hardcoded password arguments in tests
     "S108",    # Allow temp file usage in tests
     "SLF001",  # Allow private member access in tests
     "PLR2004", # Allow magic values in tests
     "INP001",  # Tests don't need __init__.py
+    "ARG001",  # Unused function arguments in fixtures
+    "ARG002",  # Unused method arguments in test methods
 ]
 "**/minio_models.py" = [
     "S105",    # Example credentials in Field examples
+]
+"**/redis_service.py" = [
+    "FBT001",  # Boolean arguments required for Redis API compatibility
+    "FBT002",  # Boolean default arguments required for Redis API compatibility
+    "A003",    # 'set' method name required for Redis API compatibility
+    "TRY300",  # Return in try block is clearer in this context
+]
+"**/redis_models.py" = [
+    "FBT003",  # Boolean positional values in Pydantic Field acceptable
 ]
 
 [tool.ruff.lint.pydocstyle]
