@@ -19,6 +19,7 @@ validate:
 	ruff check . --fix
 	ruff format .
 	uv run python -m pytest tests/ -x --tb=short
+	uv run python -m pytest integration-tests/ -x --tb=short
 
 # Install dependencies
 install:

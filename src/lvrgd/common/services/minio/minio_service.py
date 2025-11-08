@@ -286,7 +286,6 @@ class MinioService:
         method: str = "GET",
         expires: timedelta = timedelta(minutes=15),
         response_headers: dict[str, str] | None = None,
-        request_params: dict[str, Any] | None = None,
     ) -> str:
         """Generate a presigned URL for accessing an object."""
         resolved_bucket = self._resolve_bucket(bucket_name)
@@ -302,7 +301,6 @@ class MinioService:
             object_name,
             expires=expires,
             response_headers=response_headers,
-            request_params=request_params,
         )
         self.log.info("Generated presigned URL for object", object_name=object_name)
         return url
