@@ -144,9 +144,7 @@ class TestMongoServiceInitialization:
                 "host": config_without_auth.url,
                 "maxPoolSize": config_without_auth.max_pool_size,
                 "minPoolSize": config_without_auth.min_pool_size,
-                "serverSelectionTimeoutMS": (
-                    config_without_auth.server_selection_timeout_ms
-                ),
+                "serverSelectionTimeoutMS": (config_without_auth.server_selection_timeout_ms),
                 "connectTimeoutMS": config_without_auth.connect_timeout_ms,
                 "retryWrites": config_without_auth.retry_writes,
                 "retryReads": config_without_auth.retry_reads,

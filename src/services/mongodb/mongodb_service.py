@@ -244,7 +244,7 @@ class MongoService:
             self.log.debug("No document found in collection: %s", collection_name)
         return result
 
-    def find_many(  # noqa: PLR0913
+    def find_many(
         self,
         collection_name: str,
         query: dict[str, Any],
@@ -503,7 +503,7 @@ class MongoService:
         keys: str | list[tuple[str, int]],
         *,
         unique: bool = False,
-        **kwargs: Any,  # noqa: ANN401
+        **kwargs: Any,
     ) -> str:
         """Create an index on a collection.
 

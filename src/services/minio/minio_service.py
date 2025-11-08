@@ -13,9 +13,7 @@ from minio.error import S3Error
 from .minio_models import MinioConfig
 
 # Error messages
-ERROR_BUCKET_REQUIRED = (
-    "Bucket name must be provided when no default bucket is configured"
-)
+ERROR_BUCKET_REQUIRED = "Bucket name must be provided when no default bucket is configured"
 
 
 class MinioService:
@@ -74,12 +72,13 @@ class MinioService:
         """Return the list of accessible buckets, verifying connectivity."""
         try:
             buckets = self._client.list_buckets()
-            bucket_names = [bucket.name for bucket in buckets]
-            self.log.debug("Successfully listed %d bucket(s)", len(bucket_names))
-            return bucket_names
         except S3Error:
             self.log.exception("MinIO health check failed")
             raise
+        else:
+            bucket_names = [bucket.name for bucket in buckets]
+            self.log.debug("Successfully listed %d bucket(s)", len(bucket_names))
+            return bucket_names
 
     def bucket_exists(self, bucket_name: str) -> bool:
         """Check whether a bucket exists."""

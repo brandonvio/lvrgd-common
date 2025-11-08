@@ -15,12 +15,8 @@ ERROR_INVALID_BUCKET_LENGTH = (
     f"Bucket name must be between {MIN_BUCKET_NAME_LENGTH} and "
     f"{MAX_BUCKET_NAME_LENGTH} characters long"
 )
-ERROR_BUCKET_INVALID_CHARS = (
-    "Bucket name may only contain lowercase letters, numbers, '.' and '-'"
-)
-ERROR_BUCKET_START_END = (
-    "Bucket name must start and end with a lowercase letter or number"
-)
+ERROR_BUCKET_INVALID_CHARS = "Bucket name may only contain lowercase letters, numbers, '.' and '-'"
+ERROR_BUCKET_START_END = "Bucket name must start and end with a lowercase letter or number"
 
 
 class MinioConfig(BaseModel):

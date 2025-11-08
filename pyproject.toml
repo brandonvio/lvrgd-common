@@ -37,7 +37,7 @@ dev = [
     "black>=25.9.0",
 ]
 
-[tool.hatchling.build.targets.wheel]
+[tool.hatch.build.targets.wheel]
 packages = ["src/services"]
 
 [tool.uv]
@@ -54,7 +54,37 @@ dev = [
 ]
 
 [tool.ruff]
+line-length = 100
+extend-exclude = [".github"]
 lint.select = ["ALL"]
+lint.ignore = [
+    "COM812",  # Conflicts with formatter
+    "D203",    # Conflicts with D211
+    "D213",    # Conflicts with D212
+    "E501",    # Line too long (handled by formatter)
+    "TC001",   # Type-checking block - overly strict, runtime imports are fine
+    "TC003",   # Type-checking block - overly strict, runtime imports are fine
+    "PLR0913", # Too many arguments - 5 is arbitrary, 6-7 args acceptable for clarity
+    "ANN401",  # Disallow Any - sometimes needed for dict(**kwargs) patterns
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+    "D100",    # Don't require module docstrings in tests
+    "D103",    # Don't require function docstrings in tests
+    "S105",    # Allow hardcoded passwords in tests
+    "S108",    # Allow temp file usage in tests
+    "INP001",  # Tests don't need __init__.py
+]
+"**/minio_models.py" = [
+    "S105",    # Example credentials in Field examples
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.isort]
+known-first-party = ["services"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
