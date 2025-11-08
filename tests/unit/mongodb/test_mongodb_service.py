@@ -22,8 +22,8 @@ from lvrgd.common.services.logging_service import LoggingService
 from lvrgd.common.services.mongodb.mongodb_models import MongoConfig
 from lvrgd.common.services.mongodb.mongodb_service import MongoService
 
-# ruff: noqa: ARG001,ARG002  # unused arguments in fixtures/test methods are expected
-# ruff: noqa: S106  # hardcoded passwords in tests are acceptable
+# unused arguments in fixtures/test methods are expected
+# hardcoded passwords in tests are acceptable
 # boolean literals in function calls ok in tests
 # ruff: noqa: PLC0415  # imports in functions acceptable in tests
 

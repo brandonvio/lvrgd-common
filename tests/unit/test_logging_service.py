@@ -102,6 +102,7 @@ class TestLoggingService:
         self, logging_service: LoggingService, mock_console: MagicMock
     ) -> None:
         """Test that exception method captures exception details."""
+
         def raise_error() -> None:
             msg = "test error"
             raise ValueError(msg)

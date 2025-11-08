@@ -11,8 +11,6 @@ from lvrgd.common.services.logging_service import LoggingService
 from lvrgd.common.services.minio.minio_models import MinioConfig
 from lvrgd.common.services.minio.minio_service import ERROR_BUCKET_REQUIRED, MinioService
 
-# ruff: noqa: S106
-
 
 @pytest.fixture
 def mock_logger() -> Mock:
