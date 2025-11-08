@@ -8,13 +8,16 @@ This module provides a clean Redis service implementation with:
 - Health check functionality
 """
 
+from __future__ import annotations
+
+import struct
 from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Any
 
 from redis import ConnectionPool, Redis
 from redis.commands.search.field import NumericField, TagField, TextField, VectorField
-from redis.commands.search.indexDefinition import IndexDefinition, IndexType
+from redis.commands.search.index_definition import IndexDefinition, IndexType
 from redis.commands.search.query import Query
 from redis.exceptions import ConnectionError as RedisConnectionError
 from redis.exceptions import ResponseError
@@ -663,7 +666,7 @@ class RedisService:
         )
 
         # Convert vector to bytes
-        vector_bytes = b"".join(float(v).to_bytes(4, byteorder="little") for v in query_vector)
+        vector_bytes = b"".join(struct.pack("<f", float(v)) for v in query_vector)
 
         # Build the query
         query = (
