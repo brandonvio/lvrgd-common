@@ -61,8 +61,13 @@ format:
 	uv run ruff format .
 
 # Run all checks
-check: lint format test
+check: lint format typecheck test
 	@echo "All checks completed!"
+
+# Typecheck code
+typecheck:
+	@echo "Running static type checking..."
+	uv run mypy src
 
 # Clean up temporary files
 clean:

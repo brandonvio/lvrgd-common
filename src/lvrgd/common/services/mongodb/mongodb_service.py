@@ -9,9 +9,10 @@ This module provides a clean MongoDB service implementation with:
 
 from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from bson.objectid import ObjectId
+from pydantic import BaseModel
 from pymongo import MongoClient
 from pymongo.client_session import ClientSession
 from pymongo.collection import Collection
@@ -32,6 +33,8 @@ from pymongo.results import BulkWriteResult, DeleteResult, InsertOneResult, Upda
 from lvrgd.common.services.logging_service import LoggingService
 
 from .mongodb_models import MongoConfig
+
+T = TypeVar("T", bound=BaseModel)
 
 
 class MongoService:
@@ -576,6 +579,211 @@ class MongoService:
             modified=result.modified_count,
             deleted=result.deleted_count,
             upserted=result.upserted_count,
+        )
+        return result
+
+    def find_one_model(
+        self,
+        collection_name: str,
+        query: dict[str, Any],
+        model_class: type[T],
+        projection: dict[str, Any] | None = None,
+        session: ClientSession | None = None,
+    ) -> T | None:
+        """Find single document and deserialize to Pydantic model.
+
+        Args:
+            collection_name: Name of the collection
+            query: Query filter
+            model_class: Pydantic model class to deserialize into
+            projection: Fields to include/exclude
+            session: Optional session for transaction support
+
+        Returns:
+            Validated Pydantic model instance, or None if not found
+
+        Raises:
+            ValidationError: If document doesn't match model schema
+        """
+        self.log.debug(
+            "Finding document as model", collection=collection_name, model=model_class.__name__
+        )
+        doc = self.find_one(collection_name, query, projection, session)
+
+        if doc is None:
+            return None
+
+        result = model_class.model_validate(doc)
+        self.log.debug(
+            "Successfully validated model", collection=collection_name, model=model_class.__name__
+        )
+        return result
+
+    def insert_one_model(
+        self,
+        collection_name: str,
+        model: BaseModel,
+        session: ClientSession | None = None,
+    ) -> InsertOneResult:
+        """Insert a Pydantic model as a document.
+
+        Args:
+            collection_name: Name of the collection
+            model: Pydantic model instance to insert
+            session: Optional session for transaction support
+
+        Returns:
+            Result of the insert operation
+        """
+        self.log.debug("Inserting model", collection=collection_name, model=type(model).__name__)
+        document = model.model_dump()
+        result = self.insert_one(collection_name, document, session)
+        self.log.debug(
+            "Successfully inserted model", collection=collection_name, model=type(model).__name__
+        )
+        return result
+
+    def find_many_models(
+        self,
+        collection_name: str,
+        query: dict[str, Any],
+        model_class: type[T],
+        *,
+        projection: dict[str, Any] | None = None,
+        sort: list[tuple[str, int]] | None = None,
+        limit: int = 0,
+        skip: int = 0,
+        session: ClientSession | None = None,
+    ) -> list[T]:
+        """Find multiple documents and deserialize to Pydantic models.
+
+        Args:
+            collection_name: Name of the collection
+            query: Query filter
+            model_class: Pydantic model class to deserialize into
+            projection: Fields to include/exclude
+            sort: Sort criteria as list of (field, direction) tuples
+            limit: Maximum number of documents to return (0 = no limit)
+            skip: Number of documents to skip
+            session: Optional session for transaction support
+
+        Returns:
+            List of validated Pydantic model instances
+
+        Raises:
+            ValidationError: If any document doesn't match model schema
+        """
+        self.log.debug(
+            "Finding documents as models", collection=collection_name, model=model_class.__name__
+        )
+        docs = self.find_many(
+            collection_name,
+            query,
+            projection=projection,
+            sort=sort,
+            limit=limit,
+            skip=skip,
+            session=session,
+        )
+        results = [model_class.model_validate(doc) for doc in docs]
+        self.log.debug(
+            "Successfully validated models",
+            collection=collection_name,
+            model=model_class.__name__,
+            count=len(results),
+        )
+        return results
+
+    def insert_many_models(
+        self,
+        collection_name: str,
+        models: list[BaseModel],
+        *,
+        ordered: bool = True,
+        session: ClientSession | None = None,
+    ) -> list[ObjectId]:
+        """Insert multiple Pydantic models as documents.
+
+        Args:
+            collection_name: Name of the collection
+            models: List of Pydantic model instances to insert
+            ordered: Whether to stop on first error
+            session: Optional session for transaction support
+
+        Returns:
+            List of inserted document IDs
+        """
+        self.log.debug("Inserting models", collection=collection_name, count=len(models))
+        documents = [model.model_dump() for model in models]
+        result = self.insert_many(collection_name, documents, ordered=ordered, session=session)
+        self.log.debug(
+            "Successfully inserted models", collection=collection_name, count=len(result)
+        )
+        return result
+
+    def update_one_model(
+        self,
+        collection_name: str,
+        query: dict[str, Any],
+        model: BaseModel,
+        *,
+        upsert: bool = False,
+        session: ClientSession | None = None,
+    ) -> UpdateResult:
+        """Update a single document using a Pydantic model.
+
+        Args:
+            collection_name: Name of the collection
+            query: Query filter
+            model: Pydantic model instance with update data
+            upsert: Create document if it doesn't exist
+            session: Optional session for transaction support
+
+        Returns:
+            Result of the update operation
+        """
+        self.log.debug(
+            "Updating document with model", collection=collection_name, model=type(model).__name__
+        )
+        update = {"$set": model.model_dump()}
+        result = self.update_one(collection_name, query, update, upsert=upsert, session=session)
+        self.log.debug(
+            "Successfully updated with model",
+            collection=collection_name,
+            model=type(model).__name__,
+        )
+        return result
+
+    def update_many_models(
+        self,
+        collection_name: str,
+        query: dict[str, Any],
+        model: BaseModel,
+        *,
+        upsert: bool = False,
+        session: ClientSession | None = None,
+    ) -> UpdateResult:
+        """Update multiple documents using a Pydantic model.
+
+        Args:
+            collection_name: Name of the collection
+            query: Query filter
+            model: Pydantic model instance with update data
+            upsert: Create documents if they don't exist
+            session: Optional session for transaction support
+
+        Returns:
+            Result of the update operation
+        """
+        self.log.debug(
+            "Updating documents with model", collection=collection_name, model=type(model).__name__
+        )
+        update = {"$set": model.model_dump()}
+        result = self.update_many(collection_name, query, update, upsert=upsert, session=session)
+        self.log.debug(
+            "Successfully updated documents with model",
+            collection=collection_name,
+            model=type(model).__name__,
         )
         return result
 
