@@ -19,8 +19,8 @@ from bson.objectid import ObjectId
 from pymongo.errors import ConnectionFailure, OperationFailure
 from pymongo.results import BulkWriteResult, DeleteResult, InsertOneResult, UpdateResult
 
-from services.mongodb.mongodb_models import MongoConfig
-from services.mongodb.mongodb_service import MongoService
+from lvrgd.common.services.mongodb.mongodb_models import MongoConfig
+from lvrgd.common.services.mongodb.mongodb_service import MongoService
 
 # ruff: noqa: S101  # assert usage in tests is acceptable
 # ruff: noqa: SLF001  # accessing private members in tests is acceptable

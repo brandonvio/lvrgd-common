@@ -8,8 +8,8 @@ from unittest.mock import Mock, patch
 import pytest
 from minio.error import S3Error
 
-from services.minio.minio_models import MinioConfig
-from services.minio.minio_service import ERROR_BUCKET_REQUIRED, MinioService
+from lvrgd.common.services.minio.minio_models import MinioConfig
+from lvrgd.common.services.minio.minio_service import ERROR_BUCKET_REQUIRED, MinioService
 
 # ruff: noqa: S101, S106
 

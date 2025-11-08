@@ -38,7 +38,7 @@ dev = [
 
 [tool.hatch.build]
 include = [
-    "src/services/**/*.py",
+    "src/lvrgd/**/*.py",
 ]
 
 [tool.hatch.build.targets.wheel.sources]
@@ -87,7 +87,7 @@ lint.ignore = [
 convention = "google"
 
 [tool.ruff.lint.isort]
-known-first-party = ["services"]
+known-first-party = ["lvrgd"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
