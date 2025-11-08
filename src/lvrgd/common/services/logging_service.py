@@ -81,17 +81,17 @@ class LoggingService:
         in_nested = False
 
         for line in json_str.split("\n"):
-            in_nested = self._update_nested_state(line, in_nested)
+            in_nested = self._update_nested_state(line, in_nested=in_nested)
 
             if '": ' in line:
-                self._append_colored_line(output, line, level, in_nested)
+                self._append_colored_line(output, line, level, in_nested=in_nested)
             else:
                 output.append(line, style="dim white")
             output.append("\n")
 
         return output
 
-    def _update_nested_state(self, line: str, in_nested: bool) -> bool:
+    def _update_nested_state(self, line: str, *, in_nested: bool) -> bool:
         """Update whether we're in a nested section.
 
         Args:
@@ -107,7 +107,7 @@ class LoggingService:
             return False
         return in_nested
 
-    def _append_colored_line(self, output: Text, line: str, level: str, in_nested: bool) -> None:
+    def _append_colored_line(self, output: Text, line: str, level: str, *, in_nested: bool) -> None:
         """Append a colored line to the output.
 
         Args:
