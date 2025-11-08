@@ -61,7 +61,7 @@ dev = [
 
 [tool.ruff]
 line-length = 100
-extend-exclude = [".github"]
+extend-exclude = [".github", "playground"]
 lint.select = ["ALL"]
 lint.ignore = [
     "COM812",  # Conflicts with formatter
@@ -78,8 +78,11 @@ lint.ignore = [
 "tests/**/*.py" = [
     "D100",    # Don't require module docstrings in tests
     "D103",    # Don't require function docstrings in tests
+    "S101",    # Allow assert statements in tests
     "S105",    # Allow hardcoded passwords in tests
     "S108",    # Allow temp file usage in tests
+    "SLF001",  # Allow private member access in tests
+    "PLR2004", # Allow magic values in tests
     "INP001",  # Tests don't need __init__.py
 ]
 "**/minio_models.py" = [

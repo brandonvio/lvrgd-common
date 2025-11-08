@@ -22,8 +22,8 @@ from pymongo.results import BulkWriteResult, DeleteResult, InsertOneResult, Upda
 from lvrgd.common.services.mongodb.mongodb_models import MongoConfig
 from lvrgd.common.services.mongodb.mongodb_service import MongoService
 
-# ruff: noqa: S101  # assert usage in tests is acceptable
-# ruff: noqa: SLF001  # accessing private members in tests is acceptable
+# assert usage in tests is acceptable
+# accessing private members in tests is acceptable
 # ruff: noqa: ARG001,ARG002  # unused arguments in fixtures/test methods are expected
 # ruff: noqa: S106  # hardcoded passwords in tests are acceptable
 # ruff: noqa: FBT003  # boolean literals in function calls ok in tests

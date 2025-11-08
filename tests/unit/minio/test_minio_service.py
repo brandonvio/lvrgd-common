@@ -11,7 +11,7 @@ from minio.error import S3Error
 from lvrgd.common.services.minio.minio_models import MinioConfig
 from lvrgd.common.services.minio.minio_service import ERROR_BUCKET_REQUIRED, MinioService
 
-# ruff: noqa: S101, S106
+# ruff: noqa: S106
 
 
 @pytest.fixture
