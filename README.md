@@ -32,16 +32,26 @@
 
 ## Installation
 
-### Using uv (recommended)
+### From GitHub Release (recommended)
+
+Install a specific version using a git tag:
 
 ```bash
-uv add lvrgd-common
+# Using uv (recommended)
+uv add "lvrgd-common @ git+https://github.com/yourusername/lvrgd-common.git@v0.1.0"
+
+# Using pip
+pip install "lvrgd-common @ git+https://github.com/yourusername/lvrgd-common.git@v0.1.0"
 ```
 
-### Using pip
+Or install the latest from main:
 
 ```bash
-pip install lvrgd-common
+# Using uv
+uv add "lvrgd-common @ git+https://github.com/yourusername/lvrgd-common.git"
+
+# Using pip
+pip install "git+https://github.com/yourusername/lvrgd-common.git"
 ```
 
 ### From source
