@@ -2,7 +2,7 @@
 
 > Python utilities and services for MongoDB and MinIO object storage with strong typing and validation
 
-[![Python Version](https://img.shields.io/badge/python-3.13%2B-blue.svg)](https://www.python.org/downloads/)
+[![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Code Style](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 
@@ -64,7 +64,7 @@ uv sync
 
 ## Prerequisites
 
-- Python 3.13 or higher
+- Python 3.10 or higher
 - MongoDB 4.0+ (for MongoDB service)
 - MinIO or S3-compatible storage (for MinIO service)
 

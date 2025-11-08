@@ -7,7 +7,7 @@ name = "lvrgd-common"
 version = "0.1.1"
 description = "Common services and utilities for LVRGD projects"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.10"
 license = {text = "MIT"}
 authors = [
     {name = "LVRGD Team"}
@@ -17,7 +17,7 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.10",
 ]
 dependencies = [
     "minio>=7.2.7",
@@ -27,7 +27,6 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "bson>=0.5.10",
     "mongomock>=4.3.0",
     "pytest>=8.4.2",
     "pytest-asyncio>=1.2.0",
@@ -38,14 +37,16 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src"]
+exclude = ["src"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/services" = "services"
 
 [tool.uv]
 package = true
 
 [dependency-groups]
 dev = [
-    "bson>=0.5.10",
     "mongomock>=4.3.0",
     "pymongo>=4.15.1",
     "pytest>=8.4.2",
