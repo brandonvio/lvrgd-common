@@ -38,7 +38,7 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/services"]
+packages = ["src"]
 
 [tool.uv]
 package = true
