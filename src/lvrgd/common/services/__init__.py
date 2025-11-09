@@ -1,6 +1,6 @@
 """Common services and utilities for LVRGD projects."""
 
-from .logging import LoggingService
+from .logging import JsonLoggingService, LoggingService
 from .minio import MinioConfig, MinioService
 from .minio.async_minio_service import AsyncMinioService
 from .mongodb import MongoConfig, MongoService
@@ -12,6 +12,7 @@ __all__ = [
     "AsyncMinioService",
     "AsyncMongoService",
     "AsyncRedisService",
+    "JsonLoggingService",
     "LoggingService",
     "MinioConfig",
     "MinioService",

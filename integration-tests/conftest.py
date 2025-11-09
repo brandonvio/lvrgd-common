@@ -9,7 +9,6 @@ from collections.abc import AsyncIterator, Iterator
 import pytest
 import pytest_asyncio
 from dotenv import load_dotenv
-from rich.console import Console
 
 from lvrgd.common.services import LoggingService
 from lvrgd.common.services.minio.async_minio_service import AsyncMinioService
@@ -33,8 +32,7 @@ def logger() -> LoggingService:
     Returns:
         LoggingService instance
     """
-    console = Console()
-    return LoggingService(console=console)
+    return LoggingService()
 
 
 @pytest.fixture(scope="session")
