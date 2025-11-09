@@ -4,17 +4,21 @@ Loads environment variables and provides service fixtures for MinIO, MongoDB, an
 """
 
 import os
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
 
 import pytest
+import pytest_asyncio
 from dotenv import load_dotenv
 from rich.console import Console
 
 from lvrgd.common.services.logging_service import LoggingService
+from lvrgd.common.services.minio.async_minio_service import AsyncMinioService
 from lvrgd.common.services.minio.minio_models import MinioConfig
 from lvrgd.common.services.minio.minio_service import MinioService
+from lvrgd.common.services.mongodb.async_mongodb_service import AsyncMongoService
 from lvrgd.common.services.mongodb.mongodb_models import MongoConfig
 from lvrgd.common.services.mongodb.mongodb_service import MongoService
+from lvrgd.common.services.redis.async_redis_service import AsyncRedisService
 from lvrgd.common.services.redis.redis_models import RedisConfig
 from lvrgd.common.services.redis.redis_service import RedisService
 
@@ -102,6 +106,20 @@ def minio_service(logger: LoggingService, minio_config: MinioConfig) -> MinioSer
 
 
 @pytest.fixture(scope="module")
+def async_minio_service(logger: LoggingService, minio_config: MinioConfig) -> AsyncMinioService:
+    """Create AsyncMinioService instance for integration tests.
+
+    Args:
+        logger: LoggingService instance
+        minio_config: MinioConfig instance
+
+    Returns:
+        AsyncMinioService instance
+    """
+    return AsyncMinioService(logger=logger, config=minio_config)
+
+
+@pytest.fixture(scope="module")
 def mongo_service(logger: LoggingService, mongo_config: MongoConfig) -> Iterator[MongoService]:
     """Create MongoService instance for integration tests.
 
@@ -115,6 +133,24 @@ def mongo_service(logger: LoggingService, mongo_config: MongoConfig) -> Iterator
     service = MongoService(logger=logger, config=mongo_config)
     yield service
     service.close()
+
+
+@pytest_asyncio.fixture
+async def async_mongo_service(
+    logger: LoggingService, mongo_config: MongoConfig
+) -> AsyncIterator[AsyncMongoService]:
+    """Create AsyncMongoService instance for integration tests.
+
+    Args:
+        logger: LoggingService instance
+        mongo_config: MongoConfig instance
+
+    Yields:
+        AsyncMongoService instance
+    """
+    service = AsyncMongoService(logger=logger, config=mongo_config)
+    yield service
+    await service.close()
 
 
 @pytest.fixture(scope="module")
@@ -131,3 +167,21 @@ def redis_service(logger: LoggingService, redis_config: RedisConfig) -> Iterator
     service = RedisService(logger=logger, config=redis_config)
     yield service
     service.close()
+
+
+@pytest_asyncio.fixture
+async def async_redis_service(
+    logger: LoggingService, redis_config: RedisConfig
+) -> AsyncIterator[AsyncRedisService]:
+    """Create AsyncRedisService instance for integration tests.
+
+    Args:
+        logger: LoggingService instance
+        redis_config: RedisConfig instance
+
+    Yields:
+        AsyncRedisService instance
+    """
+    service = AsyncRedisService(logger=logger, config=redis_config)
+    yield service
+    await service.close()
