@@ -6,7 +6,7 @@ from unittest.mock import Mock, patch
 import pytest
 from minio.error import S3Error
 
-from lvrgd.common.services.logging_service import LoggingService
+from lvrgd.common.services import LoggingService
 from lvrgd.common.services.minio.minio_models import MinioConfig
 from lvrgd.common.services.minio.minio_service import ERROR_BUCKET_REQUIRED, MinioService
 

@@ -15,7 +15,7 @@ from bson.objectid import ObjectId
 from pydantic import BaseModel, ValidationError
 from pymongo.results import InsertOneResult, UpdateResult
 
-from lvrgd.common.services.logging_service import LoggingService
+from lvrgd.common.services import LoggingService
 from lvrgd.common.services.mongodb.mongodb_models import MongoConfig
 from lvrgd.common.services.mongodb.mongodb_service import MongoService
 

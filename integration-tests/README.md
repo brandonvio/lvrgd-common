@@ -397,7 +397,7 @@ REDIS_PASSWORD=
 ### Dependencies
 
 **Internal Dependencies** (from lvrgd-common):
-- `lvrgd.common.services.logging_service.LoggingService` - Logging with Rich console
+- `lvrgd.common.services .LoggingService` - Logging with Rich console
 - `lvrgd.common.services.minio.minio_models.MinioConfig` - MinIO configuration model
 - `lvrgd.common.services.minio.minio_service.MinioService` - MinIO service implementation
 - `lvrgd.common.services.mongodb.mongodb_models.MongoConfig` - MongoDB configuration model

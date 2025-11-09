@@ -12,7 +12,7 @@ from unittest.mock import Mock
 import pytest
 from pydantic import BaseModel, ValidationError
 
-from lvrgd.common.services.logging_service import LoggingService
+from lvrgd.common.services import LoggingService
 from lvrgd.common.services.redis.redis_models import RedisConfig
 from lvrgd.common.services.redis.redis_service import RedisService
 

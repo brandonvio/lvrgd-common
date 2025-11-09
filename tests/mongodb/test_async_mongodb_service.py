@@ -18,7 +18,7 @@ from bson.objectid import ObjectId
 from pymongo.errors import ConnectionFailure
 from pymongo.results import DeleteResult, InsertOneResult, UpdateResult
 
-from lvrgd.common.services.logging_service import LoggingService
+from lvrgd.common.services import LoggingService
 from lvrgd.common.services.mongodb.async_mongodb_service import AsyncMongoService
 from lvrgd.common.services.mongodb.mongodb_models import MongoConfig
 

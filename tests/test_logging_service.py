@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 import pytest
 from rich.console import Console
 
-from lvrgd.common.services.logging_service import LoggingService
+from lvrgd.common.services import LoggingService
 
 
 @pytest.fixture

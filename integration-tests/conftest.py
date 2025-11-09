@@ -11,7 +11,7 @@ import pytest_asyncio
 from dotenv import load_dotenv
 from rich.console import Console
 
-from lvrgd.common.services.logging_service import LoggingService
+from lvrgd.common.services import LoggingService
 from lvrgd.common.services.minio.async_minio_service import AsyncMinioService
 from lvrgd.common.services.minio.minio_models import MinioConfig
 from lvrgd.common.services.minio.minio_service import MinioService

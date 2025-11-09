@@ -452,7 +452,7 @@ __all__ = ["MinioService", "AsyncMinioService", "MinioConfig"]
 **Sync Usage** (existing, unchanged):
 ```python
 from lvrgd.common.services.minio import MinioService, MinioConfig
-from lvrgd.common.services.logging_service import LoggingService
+from lvrgd.common.services  import LoggingService
 
 logger = LoggingService()
 config = MinioConfig(endpoint="localhost:9000", access_key="...", secret_key="...")
@@ -463,7 +463,7 @@ minio.upload_file("test.txt", "/path/to/file.txt")
 **Async Usage** (new):
 ```python
 from lvrgd.common.services.minio import AsyncMinioService, MinioConfig
-from lvrgd.common.services.logging_service import LoggingService
+from lvrgd.common.services  import LoggingService
 
 logger = LoggingService()
 config = MinioConfig(endpoint="localhost:9000", access_key="...", secret_key="...")

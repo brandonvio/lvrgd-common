@@ -24,7 +24,7 @@ from pydantic import BaseModel
 from redis.exceptions import ConnectionError as RedisConnectionError
 from redis.exceptions import ResponseError
 
-from lvrgd.common.services.logging_service import LoggingService
+from lvrgd.common.services import LoggingService
 from lvrgd.common.services.redis.async_redis_service import AsyncRedisService
 from lvrgd.common.services.redis.redis_models import RedisConfig
 
