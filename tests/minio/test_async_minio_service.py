@@ -129,7 +129,7 @@ class TestHealthAndBuckets:
         service_with_client: tuple[AsyncMinioService, Mock],
     ) -> None:
         """Propagate S3 errors from the health check."""
-        service, client = service_with_client
+        service, _client = service_with_client
 
         with patch("asyncio.to_thread", new_callable=AsyncMock) as mock_to_thread:
             mock_to_thread.side_effect = S3Error(
@@ -168,7 +168,7 @@ class TestHealthAndBuckets:
         service_with_client: tuple[AsyncMinioService, Mock],
     ) -> None:
         """ensure_bucket should avoid creating existing buckets."""
-        service, client = service_with_client
+        service, _client = service_with_client
 
         with patch("asyncio.to_thread", new_callable=AsyncMock) as mock_to_thread:
             mock_to_thread.return_value = True
@@ -301,7 +301,7 @@ class TestObjectOperations:
         service_with_client: tuple[AsyncMinioService, Mock],
     ) -> None:
         """download_data should clean up the response object."""
-        service, client = service_with_client
+        service, _client = service_with_client
 
         response = Mock()
         response.read.return_value = b"payload"
@@ -405,7 +405,7 @@ class TestObjectOperations:
         service_with_client: tuple[AsyncMinioService, Mock],
     ) -> None:
         """generate_presigned_url should return the URL from the client."""
-        service, client = service_with_client
+        service, _client = service_with_client
 
         with patch("asyncio.to_thread", new_callable=AsyncMock) as mock_to_thread:
             mock_to_thread.return_value = "https://example.com/presigned"
