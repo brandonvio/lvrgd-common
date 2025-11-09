@@ -252,11 +252,15 @@ class AsyncMinioService:
             prefix=prefix,
             recursive=recursive,
         )
+        # Collect objects inside thread to avoid blocking I/O on event loop
         objects = await asyncio.to_thread(
-            self._client.list_objects,
-            resolved_bucket,
-            prefix=prefix,
-            recursive=recursive,
+            lambda: list(
+                self._client.list_objects(
+                    resolved_bucket,
+                    prefix=prefix,
+                    recursive=recursive,
+                )
+            )
         )
         object_names = [obj.object_name for obj in objects]
         self.log.info(

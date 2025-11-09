@@ -321,22 +321,28 @@ class TestObjectOperations:
         self,
         service_with_client: tuple[AsyncMinioService, Mock],
     ) -> None:
-        """list_objects should iterate over returned objects."""
+        """list_objects should collect objects in thread to avoid blocking I/O."""
         service, client = service_with_client
 
+        # Mock list_objects to return an iterator
+        client.list_objects.return_value = iter(
+            [
+                SimpleNamespace(object_name="file-1"),
+                SimpleNamespace(object_name="file-2"),
+            ],
+        )
+
         with patch("asyncio.to_thread", new_callable=AsyncMock) as mock_to_thread:
-            mock_to_thread.return_value = iter(
-                [
-                    SimpleNamespace(object_name="file-1"),
-                    SimpleNamespace(object_name="file-2"),
-                ],
-            )
+            # to_thread executes the lambda, which collects the iterator into a list
+            mock_to_thread.side_effect = lambda fn: fn()
 
             result = await service.list_objects(prefix="", recursive=False)
 
             assert result == ["file-1", "file-2"]
-            mock_to_thread.assert_called_once_with(
-                client.list_objects,
+            # Verify to_thread was called once (with the lambda)
+            mock_to_thread.assert_called_once()
+            # Verify list_objects was called with correct args
+            client.list_objects.assert_called_once_with(
                 "test-bucket",
                 prefix="",
                 recursive=False,
