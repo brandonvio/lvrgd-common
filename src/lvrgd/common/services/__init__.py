@@ -1,5 +1,6 @@
 """Common services and utilities for LVRGD projects."""
 
+from .dynamodb import DynamoDBBaseModel, DynamoDBConfig, DynamoDBService
 from .logging import JsonLoggingService, LoggingService
 from .minio import MinioConfig, MinioService
 from .minio.async_minio_service import AsyncMinioService
@@ -12,6 +13,9 @@ __all__ = [
     "AsyncMinioService",
     "AsyncMongoService",
     "AsyncRedisService",
+    "DynamoDBBaseModel",
+    "DynamoDBConfig",
+    "DynamoDBService",
     "JsonLoggingService",
     "LoggingService",
     "MinioConfig",
