@@ -62,8 +62,11 @@ Create `DynamoDBBaseModel` as pure Pydantic BaseModel:
 ### FR-2: boto3-Based Repository Service
 
 Create `DynamoDBService` that:
-- Accepts boto3 Table resource via dependency injection (not created in constructor)
-- Accepts LoggingService via dependency injection
+- Accepts `DynamoDBConfig` (table_name, region, endpoint_url, credentials) via dependency injection
+- Accepts `LoggingService` via dependency injection
+- Creates boto3 Table resource internally from config (encapsulated implementation detail)
+- boto3 is NOT exposed outside the service - it's a hidden implementation detail
+- Uses `boto3-stubs[dynamodb]` or `mypy-boto3-dynamodb` for strong typing
 - Provides CRUD operations on Pydantic models
 - Handles serialization/deserialization between Pydantic and DynamoDB
 
@@ -162,10 +165,11 @@ Beyond basic boto3 wrapping, add:
 - Service dependencies injected (mockable)
 
 ### Principle VI - Dependency Injection
-- boto3 Table resource injected (REQUIRED, no Optional, no defaults)
+- DynamoDBConfig injected (REQUIRED, no Optional, no defaults)
 - LoggingService injected (REQUIRED)
-- NEVER create boto3 clients/resources in constructor
-- Constructor only assigns dependencies
+- boto3 Table resource created internally from config (implementation detail, not a dependency)
+- Constructor creates boto3 resources from injected config parameters
+- boto3 is encapsulated within the service - not exposed externally
 
 ### Principle VII - SOLID
 - **Single Responsibility**: Service handles persistence, models hold data
@@ -178,8 +182,9 @@ Beyond basic boto3 wrapping, add:
 
 - [ ] DynamoDBBaseModel is pure Pydantic (no database logic)
 - [ ] All domain models can inherit from DynamoDBBaseModel
-- [ ] DynamoDBService uses boto3 for all operations
-- [ ] boto3 Table resource is dependency-injected (not created in constructor)
+- [ ] DynamoDBService uses boto3 for all operations (boto3 encapsulated, not exposed)
+- [ ] boto3 Table resource created internally from DynamoDBConfig
+- [ ] Strong typing using boto3-stubs or mypy-boto3-dynamodb
 - [ ] All CRUD, query, batch, and transaction operations work
 - [ ] Type hints on all methods
 - [ ] Comprehensive unit tests with mocked boto3 Table
@@ -191,9 +196,38 @@ Beyond basic boto3 wrapping, add:
 
 - Do NOT use PynamoDB
 - Do NOT put database logic in models
-- Do NOT create boto3 clients in service constructor
+- Do NOT expose boto3 outside the service
 - Do NOT add caching (can be added later)
 - Do NOT add soft deletes (can be added later)
+
+## Type Safety with boto3-stubs
+
+Use `boto3-stubs[dynamodb]` or `mypy-boto3-dynamodb` for strong typing:
+
+```python
+from mypy_boto3_dynamodb.service_resource import Table
+
+class DynamoDBService:
+    def __init__(self, logger: LoggingService, config: DynamoDBConfig) -> None:
+        self.log = logger
+        self.config = config
+
+        # Strongly typed boto3 resources
+        resource = boto3.resource(
+            "dynamodb",
+            region_name=config.region,
+            endpoint_url=config.endpoint_url,
+            aws_access_key_id=config.aws_access_key_id,
+            aws_secret_access_key=config.aws_secret_access_key,
+        )
+        self._table: Table = resource.Table(config.table_name)  # Type-safe!
+```
+
+This provides:
+- IDE autocomplete for boto3 methods
+- Type checking for boto3 operations
+- Compile-time error detection
+- Better developer experience
 
 ## Migration Path
 
