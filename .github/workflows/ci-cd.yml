@@ -93,6 +93,12 @@ jobs:
           REDIS_HOST=localhost
           REDIS_PORT=6379
           REDIS_PASSWORD=redis123
+
+          # DynamoDB Configuration
+          DYNAMODB_HOST=localhost
+          DYNAMODB_PORT=8000
+          DYNAMODB_TABLE=test-table
+          AWS_REGION=us-east-1
           EOF
 
       - name: Start Docker Compose services
@@ -106,7 +112,7 @@ jobs:
           while [ $elapsed -lt $timeout ]; do
             if docker compose ps | grep -q "healthy"; then
               healthy_count=$(docker compose ps | grep -c "healthy" || true)
-              if [ "$healthy_count" -ge 3 ]; then
+              if [ "$healthy_count" -ge 4 ]; then
                 echo "All services are healthy"
                 docker compose ps
                 break
@@ -140,6 +146,10 @@ jobs:
           REDIS_HOST: localhost
           REDIS_PORT: 6379
           REDIS_PASSWORD: redis123
+          DYNAMODB_HOST: localhost
+          DYNAMODB_PORT: 8000
+          DYNAMODB_TABLE: test-table
+          AWS_REGION: us-east-1
 
       - name: Stop Docker Compose services
         if: always()
