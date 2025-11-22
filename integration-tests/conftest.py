@@ -228,9 +228,14 @@ def dynamodb_service(logger: LoggingService, dynamodb_config: DynamoDBConfig) ->
         DynamoDBService instance
     """
     # Create DynamoDB client for table management
-    # Use dummy credentials for local DynamoDB if not provided
-    access_key = dynamodb_config.aws_access_key_id or "testing"
-    secret_key = dynamodb_config.aws_secret_access_key or "testing"
+    # For local DynamoDB (endpoint_url set), always use dummy credentials
+    # Real AWS credentials cause "invalid security token" errors with local DynamoDB
+    if dynamodb_config.endpoint_url:
+        access_key = "testing"
+        secret_key = "testing"
+    else:
+        access_key = dynamodb_config.aws_access_key_id
+        secret_key = dynamodb_config.aws_secret_access_key
 
     dynamodb_client = boto3.client(
         "dynamodb",
