@@ -59,10 +59,15 @@ class DynamoDBService:
         # Create boto3 resource and table internally (NOT injected)
         session_kwargs: dict[str, Any] = {"region_name": config.region}
 
-        if config.aws_access_key_id:
-            session_kwargs["aws_access_key_id"] = config.aws_access_key_id
-        if config.aws_secret_access_key:
-            session_kwargs["aws_secret_access_key"] = config.aws_secret_access_key
+        # For local DynamoDB (endpoint_url set), use dummy credentials if not provided
+        if config.endpoint_url:
+            session_kwargs["aws_access_key_id"] = config.aws_access_key_id or "testing"
+            session_kwargs["aws_secret_access_key"] = config.aws_secret_access_key or "testing"
+        else:
+            if config.aws_access_key_id:
+                session_kwargs["aws_access_key_id"] = config.aws_access_key_id
+            if config.aws_secret_access_key:
+                session_kwargs["aws_secret_access_key"] = config.aws_secret_access_key
 
         dynamodb = boto3.resource("dynamodb", **session_kwargs)
 
