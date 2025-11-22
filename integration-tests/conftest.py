@@ -228,12 +228,16 @@ def dynamodb_service(logger: LoggingService, dynamodb_config: DynamoDBConfig) ->
         DynamoDBService instance
     """
     # Create DynamoDB client for table management
+    # Use dummy credentials for local DynamoDB if not provided
+    access_key = dynamodb_config.aws_access_key_id or "testing"
+    secret_key = dynamodb_config.aws_secret_access_key or "testing"
+
     dynamodb_client = boto3.client(
         "dynamodb",
         region_name=dynamodb_config.region,
         endpoint_url=dynamodb_config.endpoint_url,
-        aws_access_key_id=dynamodb_config.aws_access_key_id,
-        aws_secret_access_key=dynamodb_config.aws_secret_access_key,
+        aws_access_key_id=access_key,
+        aws_secret_access_key=secret_key,
     )
 
     # Create table if it doesn't exist
