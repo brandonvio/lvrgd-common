@@ -6,8 +6,10 @@ Loads environment variables and provides service fixtures for MinIO, MongoDB, an
 import os
 from collections.abc import AsyncIterator, Iterator
 
+import boto3
 import pytest
 import pytest_asyncio
+from botocore.exceptions import ClientError
 from dotenv import load_dotenv
 
 from lvrgd.common.services import LoggingService
@@ -225,8 +227,6 @@ def dynamodb_service(logger: LoggingService, dynamodb_config: DynamoDBConfig) ->
     Yields:
         DynamoDBService instance
     """
-    import boto3
-
     # Create DynamoDB client for table management
     dynamodb_client = boto3.client(
         "dynamodb",
@@ -265,5 +265,5 @@ def dynamodb_service(logger: LoggingService, dynamodb_config: DynamoDBConfig) ->
     try:
         logger.info("Deleting test table", table_name=dynamodb_config.table_name)
         dynamodb_client.delete_table(TableName=dynamodb_config.table_name)
-    except Exception as e:
+    except ClientError as e:
         logger.warning("Failed to delete test table", error=str(e))
