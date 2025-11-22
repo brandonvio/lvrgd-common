@@ -31,6 +31,10 @@ test:
 	@echo "Running unit tests..."
 	uv run python -m pytest tests/ -x
 
+test-integration:
+	@echo "Running integration tests..."
+	uv run python -m pytest integration-tests/ -x
+
 test-short:
 	@echo "Running short unit tests..."
 	uv run python -m pytest tests/ -v --tb=short

@@ -20,11 +20,14 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
 ]
 dependencies = [
+    "boto3>=1.35.0",
     "loguru>=0.7.3",
     "minio>=7.2.7",
     "motor>=3.3.0",
+    "mypy-boto3-dynamodb>=1.40.56",
     "pydantic>=2.11.9",
     "pymongo>=4.15.1",
+    "pynamodb>=6.1.0",
     "redis>=5.0.0",
     "rich>=14.2.0",
 ]
@@ -55,6 +58,7 @@ package = true
 
 [dependency-groups]
 dev = [
+    "boto3-stubs[dynamodb]>=1.35.0",
     "mongomock>=4.3.0",
     "pymongo>=4.15.1",
     "pytest>=8.4.2",
@@ -129,6 +133,18 @@ lint.ignore = [
 ]
 "**/redis_models.py" = [
     "FBT003",  # Boolean positional values in Pydantic Field acceptable
+]
+"**/dynamodb_service.py" = [
+    "PLR0911", # Too many return statements acceptable for operator mapping
+    "TRY003",  # Long exception messages acceptable for error context
+    "EM102",   # F-string in exceptions acceptable for error context
+    "TRY300",  # Return in try block is clearer in this context
+    "TRY301",  # Raise in try block is clearer in this context
+    "TRY400",  # logging.error with raise is intentional for structured logging
+]
+"**/sort_key_condition.py" = [
+    "TRY003",  # String literal in exception acceptable for validation
+    "EM101",   # String literal in exception acceptable for validation
 ]
 
 [tool.ruff.lint.pydocstyle]
