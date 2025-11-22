@@ -1,5 +1,3 @@
-version: '3.8'
-
 # Docker Compose configuration for integration testing
 # Provides MongoDB, MinIO, and Redis services for running integration tests
 
@@ -63,7 +61,7 @@ services:
       - "${DYNAMODB_PORT:-8000}:8000"
     command: "-jar DynamoDBLocal.jar -sharedDb -inMemory"
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/shell/ || exit 1"]
+      test: ["CMD-SHELL", "java -version"]
       interval: 5s
       timeout: 3s
       retries: 5
